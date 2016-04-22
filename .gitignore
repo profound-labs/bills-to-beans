@@ -1,0 +1,26 @@
+.#*
+/target
+/classes
+/checkouts
+profiles.clj
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+/.lein-*
+/.nrepl-port
+/resources/public/js
+/out
+/.repl
+*.log
+/.env
+# sass and generated css
+/.sass-cache
+/public/css
+# binary
+bills-to-beans
+# cljs
+/public/js/out
+/public/js/app.js
+# bower_components
+/public/bower_components

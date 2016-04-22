@@ -1,0 +1,30 @@
+body {
+  padding-top: 20pt;
+  padding-bottom: 30px;
+}
+
+.theme-dropdown .dropdown-menu {
+  position: static;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.theme-showcase > p > .btn {
+  margin: 5px 0;
+}
+
+.theme-showcase .navbar .container {
+  width: auto;
+}
+
+input[type="file"].image-input {
+    display: none;
+}
+.image-file-upload {
+    border-color: transparent;
+    color: #fff;
+    background-color: #DF691A;
+    display: inline-block;
+    padding: 6px 12px;
+    cursor: pointer;
+}

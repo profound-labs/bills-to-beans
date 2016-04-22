@@ -1,0 +1,28 @@
+
+// Font Awesome
+
+// path relative to site.css
+$fa-font-path: "../bower_components/font-awesome/fonts/"
+
+// path relative to site.sass
+@import "../../public/bower_components/font-awesome/scss/font-awesome.scss"
+
+@import "typefaces"
+
+// compass stuff before variables
+@import "../../public/bower_components/bootstrap-sass/assets/stylesheets/_bootstrap-compass.scss"
+
+// customize variables before bootstrap
+$icon-font-path: "../bower_components/bootstrap-sass/assets/fonts/bootstrap/"
+@import "superhero_variables.scss"
+
+// bootstrap is bootstrap-sass
+@import "../../public/bower_components/bootstrap-sass/assets/stylesheets/_bootstrap.scss"
+
+// bootswatch after bootstrap
+@import "superhero_bootswatch.scss"
+
+@import "theme"
+
+.drop-area
+  border: 2px dashed #ccc
