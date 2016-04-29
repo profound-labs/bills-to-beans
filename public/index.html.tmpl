@@ -13,21 +13,23 @@
             </div>
             <div class="col-md-3" style="text-align: right;">
                 <p><a href="" id="qr-code-link"></a></p>
-                <canvas id="qr-code"></canvas>
+                <!-- <canvas id="qr-code"></canvas> -->
             </div>
         </div>
     </div>
     <div id="app">
     </div>
     <script src="js/app.js" type="text/javascript"></script>
+    <!--
     <script src="bower_components/qr-js/qr.min.js" type="text/javascript"></script>
+    -->
     <script>
      var pageUrl = {{ .localAddress }};
-     qr.canvas({
-         canvas: document.getElementById('qr-code'),
-         size: 2,
-         value: pageUrl
-     });
+     // qr.canvas({
+     //     canvas: document.getElementById('qr-code'),
+     //     size: 4,
+     //     value: pageUrl
+     // });
      var qrLink = document.getElementById('qr-code-link');
      qrLink.setAttribute('href', pageUrl);
      qrLink.innerText = pageUrl;

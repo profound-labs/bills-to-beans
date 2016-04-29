@@ -1,14 +1,14 @@
 (ns bills-to-beans.core
     (:require [reagent.core :as r :refer [atom]]
               [reagent.session :as session]
-              [bills-to-beans.bill :refer [<bill-upload-page>]]
+              [bills-to-beans.bill :refer [<new-transaction-page>]]
               [secretary.core :as secretary :include-macros true]))
 
 ;; -------------------------
 ;; Views
 
 (defn home-page []
-  [:div [<bill-upload-page>]])
+  [:div [<new-transaction-page>]])
 
 ;; -------------------------
 ;; Initialize app
