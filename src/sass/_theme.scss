@@ -3,6 +3,22 @@ body {
   padding-bottom: 30px;
 }
 
+#flash_wrap {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    padding: 1em;
+    margin: 0px auto;
+}
+
+.table {
+    font-size: 16px;
+}
+
+#qr-code-wrap {
+    margin-top: 2em;
+}
+
 .theme-dropdown .dropdown-menu {
   position: static;
   display: block;

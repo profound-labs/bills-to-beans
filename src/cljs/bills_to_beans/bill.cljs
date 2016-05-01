@@ -6,21 +6,22 @@
             [secretary.core :as secretary :include-macros true]
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
+            [bills-to-beans.helpers :refer [flash!]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
 
 (declare <new-transaction-form> <payees-list>)
 
-(def default-transaction {:date (subs (.toISOString (js/Date.)) 0 10)
-                          :flag "*"
-                          :payee nil
-                          :narration nil
-                          :tags []
-                          :link nil
-                          :postings [{:account nil :amount 0.00 :currency nil}
-                                     {:account nil :amount 0.00 :currency nil}]
-                          :documents [{:path nil :size nil}]})
+(defonce default-transaction {:date (subs (.toISOString (js/Date.)) 0 10)
+                              :flag "*"
+                              :payee nil
+                              :narration nil
+                              :tags []
+                              :link nil
+                              :postings [{:account "Assets:PT:Bank:Current" :amount "-0.00" :currency "EUR"}
+                                         {:account "Expenses:General" :amount "0.00" :currency "EUR"}]
+                              :documents [{:path nil :size nil}]})
 
 (defonce transaction-data (r/atom default-transaction))
 
@@ -31,6 +32,12 @@
 (def currencies (r/atom []))
 
 (def accounts (r/atom []))
+
+(defn first-assets-account [accounts]
+  "Assets:PT:Bank:Current")
+
+(defn first-expenses-account [accounts]
+  "Expenses:General")
 
 (defn not-zero? [korks error-message]
   (fn [cursor]
@@ -79,37 +86,53 @@
 
                                 (if (:success response)
                                   (do
-                                    (reset! transaction-data default-transaction))
-                                  ;; TODO flash error
-                                  (prn (:body response))
+                                    (reset! transaction-data default-transaction)
+                                    (flash! response))
+                                  (flash! response)
                                   ))))))]
 
     (r/create-class {:component-will-mount
                      (fn []
                        (get-resource "/completions.json" completions)
-                       (get-resource "/accounts.json" accounts (fn [res] (prn res)))
-                       (get-resource "/currencies.json" currencies (fn [res] (prn res))))
+                       (get-resource "/accounts.json" accounts
+                                     (fn [res]
+                                       (swap! transaction-data update-in
+                                              [:postings 0 :account] #(first-assets-account res))
+                                       (swap! transaction-data update-in
+                                              [:postings 1 :account] #(first-expenses-account res))))
+                       (get-resource "/currencies.json" currencies
+                                     (fn [res]
+                                       (swap! transaction-data update-in
+                                              [:postings 0 :currency] #(first @currencies))
+                                       (swap! transaction-data update-in
+                                              [:postings 1 :currency] #(first @currencies)))))
 
                      :reagent-render
                      (fn []
                        [:div.container.transaction
                         [:div.row
-                         [:h1.col-sm-7.col-sm-offset-3
-                          (if (string/blank? @narration)
-                            "New Transaction"
-                            @narration)]]
-                        [:div.row
-                         [:div.col-sm-3
+
+                         [:div.col-sm-2
                           [:h4 "Payees"]
                           [<payees-list> completions]]
-                         [:div.col-sm-9
-                          [<new-transaction-form> transaction-data transaction-ui-state]]]
-                        [:div.row {:style {:marginTop "2em"}}
-                         [:div.col-sm-7.col-sm-offset-3
-                          [:button.btn.btn-primary {:on-click submit-transaction!}
-                           [:i.fa.fa-hand-o-right]
-                           [:span " SAVE"]]]]
-                        ])})))
+
+                         [:div.col-sm-10
+                          [:div.row
+                           [:h1.col-sm-12
+                            (if (string/blank? @narration)
+                              "New Transaction"
+                              @narration)]]
+                          [:div.row
+                           [:div.col-sm-12
+                            [<new-transaction-form> transaction-data transaction-ui-state]]]
+                          [:div.row {:style {:marginTop "2em"}}
+                           [:div.col-sm-12
+                            [:button.btn.btn-primary {:on-click submit-transaction!}
+                             [:i.fa.fa-hand-o-right]
+                             [:span " SAVE"]]]]]
+
+                         ]]
+                       )})))
 
 (defn balance-two-postings! [changed-idx]
   (when (= 2 (count (:postings @transaction-data)))

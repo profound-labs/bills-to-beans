@@ -101,7 +101,7 @@ func TestSanitizedBase(t *testing.T) {
 		},
 	}
 
-	expect := `2016-02-12 _ Café de 'João' _ dois X café por cabeça _ -5.50 EUR`
+	expect := `2016-02-12 _ Café de 'João' _ dois X café por cabeça _ 5.50 EUR`
 	res := txn.sanitizedBase()
 
 	if res != expect {
@@ -117,7 +117,7 @@ func TestSanitizedBase(t *testing.T) {
 		},
 	}
 
-	expect = `2016-02-12 _ dois X café por cabeça _ -5.50 EUR`
+	expect = `2016-02-12 _ dois X café por cabeça _ 5.50 EUR`
 	res = txn.sanitizedBase()
 
 	if res != expect {

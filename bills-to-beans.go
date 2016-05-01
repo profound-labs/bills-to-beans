@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/skratchdot/open-golang/open"
 	"log"
+	"math"
 	"os/signal"
 	"syscall"
 	//"github.com/jung-kurt/gofpdf"
@@ -91,6 +92,7 @@ type Transaction struct {
 	Link      string     `json:"link"`
 	Postings  []Posting  `json:"postings"`
 	Documents []Document `json:"documents"`
+	DirPath   string
 }
 
 type Balance struct {
@@ -196,7 +198,9 @@ func (t Transaction) sumAmountFmt() string {
 
 	// 1 or 2 postings, first is the amount
 	if len(t.Postings) <= 2 {
-		return fmt.Sprintf("%.2f %s", t.Postings[0].Amount, t.Postings[0].Currency)
+		return fmt.Sprintf("%.2f %s",
+			math.Abs(t.Postings[0].Amount),
+			t.Postings[0].Currency)
 	}
 	return ""
 }
@@ -226,27 +230,48 @@ func (t Transaction) sanitizedBase() string {
 	return sanitizeFilename(s.Join(parts, " _ "))
 }
 
-func (t Transaction) DirPath() string {
-	return filepath.Join(
+// Check if a path exists
+// http://stackoverflow.com/a/10510783/195141
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
+
+func (t *Transaction) EnsureDirPath() error {
+	var err error
+
+	t.DirPath = filepath.Join(
 		config.BillsFolder,
 		fmt.Sprintf("%04d", t.Date.Year()),
 		fmt.Sprintf("%02d", t.Date.Month()),
 		t.sanitizedBase(),
 	)
+
+	if ex, _ := exists(t.DirPath); ex {
+		return errors.New(fmt.Sprintf("Already exists: %s", t.DirPath))
+	}
+
+	if err = os.MkdirAll(t.DirPath, 0755); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (t Transaction) BeancountFilename() string {
 	return "transaction.beancount"
 }
 
-func (t Transaction) SaveBeancount() error {
+func (t *Transaction) SaveBeancount() error {
 	var err error
 
-	if err = os.MkdirAll(t.DirPath(), 0755); err != nil {
-		return err
-	}
-
-	path := filepath.Join(t.DirPath(), t.BeancountFilename())
+	path := filepath.Join(t.DirPath, t.BeancountFilename())
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
@@ -319,12 +344,11 @@ func (d Document) Copy(dst string) error {
 
 func (t Transaction) SaveDocuments() error {
 	var err error
-	dirPath := t.DirPath()
 
 	for idx, doc := range t.Documents {
 		if !doc.Saved {
 			newpath := filepath.Join(
-				dirPath,
+				t.DirPath,
 				fmt.Sprintf("doc%d%s", idx+1, filepath.Ext(doc.Path)),
 			)
 			err = doc.Copy(newpath)
@@ -340,8 +364,12 @@ func (t Transaction) SaveDocuments() error {
 	return nil
 }
 
-func (t Transaction) Save() error {
+func (t *Transaction) Save() error {
 	var err error
+
+	if err = t.EnsureDirPath(); err != nil {
+		return err
+	}
 
 	if err = t.SaveBeancount(); err != nil {
 		return err
@@ -398,6 +426,17 @@ func GetLocalIP() string {
 	return ""
 }
 
+func sendError(w http.ResponseWriter, status string, err error) {
+	data := make(map[string]interface{})
+	msg := fmt.Sprintf("%v", err)
+	log.Println(msg)
+	w.Header().Set("Content-type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	data["flash"] = msg
+	enc := json.NewEncoder(w)
+	enc.Encode(data)
+}
+
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	data := make(map[string]string)
 	data["localAddress"] = fmt.Sprintf("http://%s:%d", GetLocalIP(), config.ServerPort)
@@ -429,7 +468,7 @@ func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	var aux_txn auxiliary_txn
 
 	if err := decoder.Decode(&aux_txn); err != nil {
-		log.Printf("%v", err)
+		sendError(w, "500", err)
 		return
 	}
 
@@ -455,16 +494,36 @@ func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := txn.Save(); err != nil {
-		log.Printf("%v", err)
+		sendError(w, "500", err)
 		return
 	}
 
+	enc := json.NewEncoder(w)
+
 	data := make(map[string]interface{})
-	data["msg"] = txn
+	data["flash"] = "Saved"
 
 	w.Header().Set("Content-type", "application/json")
-	enc := json.NewEncoder(w)
 	enc.Encode(data)
+}
+
+// UniqStr returns a copy of the passed slice with only unique string results.
+// http://www.golangbootcamp.com/book/tricks_and_tips
+func UniqStr(col []string) []string {
+	m := map[string]struct{}{}
+	for _, v := range col {
+		if _, ok := m[v]; !ok {
+			m[v] = struct{}{}
+		}
+	}
+	list := make([]string, len(m))
+
+	i := 0
+	for v := range m {
+		list[i] = v
+		i++
+	}
+	return list
 }
 
 func completionsHandler(w http.ResponseWriter, r *http.Request) {
@@ -498,6 +557,10 @@ func completionsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	completions["payees"] = UniqStr(completions["payees"])
+	completions["tags"] = UniqStr(completions["tags"])
+	completions["links"] = UniqStr(completions["links"])
+
 	w.Header().Set("Content-type", "application/json")
 	enc := json.NewEncoder(w)
 	enc.Encode(completions)
@@ -506,7 +569,7 @@ func completionsHandler(w http.ResponseWriter, r *http.Request) {
 func accountsHandler(w http.ResponseWriter, r *http.Request) {
 	c, err := ioutil.ReadFile(config.MainBeancountFile)
 	if err != nil {
-		log.Printf("%v", err)
+		sendError(w, "500", err)
 		return
 	}
 
@@ -529,7 +592,7 @@ func accountsHandler(w http.ResponseWriter, r *http.Request) {
 func currenciesHandler(w http.ResponseWriter, r *http.Request) {
 	c, err := ioutil.ReadFile(config.MainBeancountFile)
 	if err != nil {
-		log.Printf("%v", err)
+		sendError(w, "500", err)
 		return
 	}
 
