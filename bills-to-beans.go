@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	//"errors"
+	"errors"
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/codegangsta/negroni"
@@ -11,7 +11,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/skratchdot/open-golang/open"
 	"log"
-	//"math"
 	"os/signal"
 	"syscall"
 	//"github.com/jung-kurt/gofpdf"
@@ -150,10 +149,10 @@ func (p Posting) String() string {
 func (t Transaction) titleFmt() string {
 	var out []string
 	if len(t.Payee) > 0 {
-		out = append(out, fmt.Sprintf("%q", t.Payee))
+		out = append(out, `"`+s.Replace(t.Payee, `"`, `'`, -1)+`"`)
 	}
 	if len(t.Narration) > 0 {
-		out = append(out, fmt.Sprintf("%q", t.Narration))
+		out = append(out, `"`+s.Replace(t.Narration, `"`, `'`, -1)+`"`)
 	}
 	return s.Join(out, " ")
 }
@@ -168,20 +167,6 @@ func (t Transaction) flagFmt() string {
 	return "*"
 }
 
-func (t Transaction) tagFmt() string {
-	if len(t.Tags) > 0 {
-		return "#" + s.Join(t.Tags, " #")
-	}
-	return ""
-}
-
-func (t Transaction) linkFmt() string {
-	if len(t.Link) > 0 {
-		return "^" + s.Replace(t.Link, " ", "-", -1)
-	}
-	return ""
-}
-
 func (t Transaction) String() string {
 	out := ""
 
@@ -189,8 +174,8 @@ func (t Transaction) String() string {
 		t.Date.Format("2006-01-02"),
 		t.flagFmt(),
 		t.titleFmt(),
-		t.tagFmt(),
-		t.linkFmt(),
+		s.Join(t.Tags, " "),
+		t.Link,
 	}
 
 	out = out + regexp.MustCompile(`  +`).ReplaceAllString(s.Join(firstLineParts, " "), " ")
@@ -223,15 +208,22 @@ func sanitizeFilename(text string) string {
 }
 
 func (t Transaction) sanitizedBase() string {
-	return sanitizeFilename(s.Join(
-		[]string{
+	var parts []string
+	if len(t.Payee) > 0 {
+		parts = []string{
 			t.Date.Format("2006-01-02"),
 			t.Payee,
 			t.Narration,
 			t.sumAmountFmt(),
-		},
-		" _ ",
-	))
+		}
+	} else {
+		parts = []string{
+			t.Date.Format("2006-01-02"),
+			t.Narration,
+			t.sumAmountFmt(),
+		}
+	}
+	return sanitizeFilename(s.Join(parts, " _ "))
 }
 
 func (t Transaction) DirPath() string {
@@ -265,6 +257,41 @@ func (t Transaction) SaveBeancount() error {
 	_, err = f.WriteString(t.String())
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (t *Transaction) ParseBeancount(text string) error {
+	text = s.TrimSpace(text)
+	firstLine := s.TrimSpace(s.Split(text, "\n")[0])
+
+	re := regexp.MustCompile(`^([^ ]+) ([\*\!]) +("[^"]+")? +("[^"]+")?`)
+	matches := re.FindStringSubmatch(firstLine)
+
+	if len(matches) > 0 {
+		t.Date, _ = time.Parse("2006-01-02", matches[1])
+		t.Flag = matches[2]
+		if len(matches[4]) > 0 {
+			t.Payee = s.Trim(matches[3], `"`)
+			t.Narration = s.Trim(matches[4], `"`)
+		} else {
+			t.Narration = s.Trim(matches[3], `"`)
+		}
+	} else {
+		return errors.New("no matches")
+	}
+
+	re = regexp.MustCompile(`#[\w-]+`)
+	matches = re.FindAllString(firstLine, -1)
+	if matches != nil {
+		t.Tags = matches
+	}
+
+	re = regexp.MustCompile(`\^[\w-]+`)
+	match := re.FindString(firstLine)
+	if len(match) != 0 {
+		t.Link = match
 	}
 
 	return nil
@@ -352,10 +379,10 @@ func MyClassic() *negroni.Negroni {
 	return negroni.New(negroni.NewRecovery(), negroni.NewLogger(), negroni.NewStatic(Dir(useLocal, "/public")))
 }
 
+// GetLocalIP returns the non loopback local IP of the host
+// http://stackoverflow.com/a/31551220/195141
+// could also do https://www.socketloop.com/tutorials/golang-how-do-I-get-the-local-ip-non-loopback-address
 func GetLocalIP() string {
-	// GetLocalIP returns the non loopback local IP of the host
-	// http://stackoverflow.com/a/31551220/195141
-	// could also do https://www.socketloop.com/tutorials/golang-how-do-I-get-the-local-ip-non-loopback-address
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return ""
@@ -411,8 +438,8 @@ func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	txn := Transaction{
 		Date:      date,
 		Flag:      aux_txn.Flag,
-		Payee:     aux_txn.Payee,
-		Narration: aux_txn.Narration,
+		Payee:     s.Replace(aux_txn.Payee, `"`, `'`, -1),
+		Narration: s.Replace(aux_txn.Narration, `"`, `'`, -1),
 	}
 
 	for _, p := range aux_txn.Postings {
@@ -440,6 +467,42 @@ func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
+func completionsHandler(w http.ResponseWriter, r *http.Request) {
+	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
+	paths, _ := filepath.Glob(globpath)
+
+	completions := make(map[string][]string)
+
+	completions["payees"] = []string{}
+	completions["tags"] = []string{}
+	completions["links"] = []string{}
+
+	for _, path := range paths {
+		c, _ := ioutil.ReadFile(path)
+		text := string(c)
+		txn := Transaction{}
+		if err := txn.ParseBeancount(text); err != nil {
+			log.Printf("%v", err)
+		} else {
+			if len(txn.Payee) > 0 {
+				completions["payees"] = append(completions["payees"], txn.Payee)
+			}
+			if len(txn.Link) > 0 {
+				completions["links"] = append(completions["links"], txn.Link)
+			}
+			if len(txn.Tags) > 0 {
+				for _, t := range txn.Tags {
+					completions["tags"] = append(completions["tags"], t)
+				}
+			}
+		}
+	}
+
+	w.Header().Set("Content-type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.Encode(completions)
+}
+
 func figletString(text string) string {
 	ascii := figlet4go.NewAsciiRender()
 	renderStr, _ := ascii.Render(text)
@@ -451,6 +514,7 @@ func startServer(port int) {
 
 	router.HandleFunc("/", indexHandler).Methods("GET")
 	router.HandleFunc("/save-transaction", saveTransactionHandler).Methods("POST")
+	router.HandleFunc("/completions", completionsHandler).Methods("GET")
 
 	n := MyClassic()
 	n.UseHandler(router)

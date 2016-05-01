@@ -24,3 +24,6 @@ bills-to-beans
 /public/js/app.js
 # bower_components
 /public/bower_components
+# temp
+/bills
+/testbills

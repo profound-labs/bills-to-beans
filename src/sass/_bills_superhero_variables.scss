@@ -182,12 +182,12 @@ $btn-border-radius-small:        $border-radius-small !default;
 //##
 
 //** `<input>` background color
-$input-bg:                       #fff !default;
+$input-bg:                       $body-bg !default;
 //** `<input disabled>` background color
 $input-bg-disabled:              $gray-lighter !default;
 
 //** Text color for `<input>`s
-$input-color:                    $body-bg !default;
+$input-color:                    #fff !default;
 //** `<input>` border color
 $input-border:                   transparent !default;
 
@@ -204,7 +204,7 @@ $input-border-radius-small:      $border-radius-small !default;
 $input-border-focus:             transparent !default;
 
 //** Placeholder text color
-$input-color-placeholder:        #ccc !default;
+$input-color-placeholder:        $gray-light !default;
 
 //** Default `.form-control` height
 $input-height-base:              ($line-height-computed + ($padding-base-vertical * 2) + 2) !default;
@@ -670,7 +670,7 @@ $progress-bar-info-bg:        $brand-info !default;
 //##
 
 //** Background color on `.list-group-item`
-$list-group-bg:                 $gray-light !default;
+$list-group-bg:                 $body-bg !default;
 //** `.list-group-item` border color
 $list-group-border:             transparent !default;
 //** List group border radius
