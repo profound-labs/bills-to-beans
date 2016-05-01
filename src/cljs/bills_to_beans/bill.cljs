@@ -18,8 +18,8 @@
                           :narration nil
                           :tags []
                           :link nil
-                          :postings [{:account "Assets:PT:Bank:Current" :amount 0.00 :currency "EUR"}
-                                     {:account "Expenses:General" :amount 0.00 :currency "EUR"}]
+                          :postings [{:account nil :amount 0.00 :currency nil}
+                                     {:account nil :amount 0.00 :currency nil}]
                           :documents [{:path nil :size nil}]})
 
 (defonce transaction-data (r/atom default-transaction))
@@ -28,34 +28,9 @@
                           :tags []
                           :links []}))
 
-(def currencies (map (fn [i] [i i])
-                     ["EUR" "GBP" "USD"]))
+(def currencies (r/atom []))
 
-(def accounts  (map (fn [i] [i i])
-                    [
-                     "Assets:PT:Bank:Current"
-                     "Assets:PT:Petty-Cash"
-                     "Assets:UK:Bank:Current"
-                     "Expenses:Car"
-                     "Expenses:Car:Gasoline"
-                     "Expenses:Financial:Fees"
-                     "Expenses:General"
-                     "Expenses:Insurance:Tranquilidade"
-                     "Expenses:Maintenance"
-                     "Expenses:Maintenance:Electricity"
-                     "Expenses:Maintenance:Gas"
-                     "Expenses:Maintenance:Rent"
-                     "Expenses:Maintenance:Water"
-                     "Expenses:Maintenance:Wood"
-                     "Expenses:Purchases"
-                     "Expenses:Travel"
-                     "Expenses:Travel:Parking"
-                     "Expenses:Travel:ViaVerde"
-                     "Income:Donations"
-                     "Income:Donations:DonationBox"
-                     "Income:Donations:Retreats"
-                     "Income:General"
-                     ]))
+(def accounts (r/atom []))
 
 (defn not-zero? [korks error-message]
   (fn [cursor]
@@ -66,6 +41,7 @@
   (let [transaction-ui-state (r/atom {})
         payee (r/cursor transaction-data [:payee])
         narration (r/cursor transaction-data [:narration])
+
         validate-transaction! (fn []
                                 (v/validate! transaction-data transaction-ui-state
                                              (v/present [:narration] "Must have")
@@ -73,14 +49,29 @@
                                              (not-zero? [:postings 0 :amount] "Must have")
                                              (not-zero? [:postings 1 :amount] "Must have")
                                              ))
+
+        get-resource (fn [url data & success-callback]
+                       (go (let [response (<! (http/get url))]
+                             (if (:success response)
+                               (let [res (:body response)]
+                                 (reset! data res)
+                                 (if (not (nil? success-callback))
+                                   ((first success-callback) res))
+                                 )
+                               ;; TODO flash error
+                               (prn (:body response))
+                               ))))
+
         str-amounts (fn [postings]
                       (map (fn [p] (assoc p :amount (str (:amount p))))
                            postings))
+
         req-save (fn []
                    (http/post
                     "/save-transaction"
                     {:json-params
                      (update-in @transaction-data [:postings] str-amounts)}))
+
         submit-transaction! (fn [_]
                        (when (validate-transaction!)
                          (do
@@ -94,13 +85,10 @@
                                   ))))))]
 
     (r/create-class {:component-will-mount
-                     (fn [] (go (let [response (<! (http/get
-                                                    "/completions"))]
-                                  (if (:success response)
-                                    (reset! completions (:body response))
-                                    ;; TODO flash error
-                                    (prn (:body response))
-                                    ))))
+                     (fn []
+                       (get-resource "/completions.json" completions)
+                       (get-resource "/accounts.json" accounts (fn [res] (prn res)))
+                       (get-resource "/currencies.json" currencies (fn [res] (prn res))))
 
                      :reagent-render
                      (fn []
@@ -159,12 +147,12 @@
     [:div.row
      [:div.col-sm-6
       (v/form ui-state
-              (v/select data [:postings idx :account] accounts))]
+              (v/select data [:postings idx :account] (map (fn [i] [i i]) @accounts)))]
      [:div.col-sm-3.col-sm-offset-1
       [<posting-amount> idx data ui-state]]
      [:div.col-sm-2
       (v/form ui-state
-              (v/select data [:postings idx :currency] currencies
+              (v/select data [:postings idx :currency] (map (fn [i] [i i]) @currencies)
                         :on-change (fn [_] (balance-two-postings! idx))))]]))
 
 (defn <new-transaction-form> [data ui-state]

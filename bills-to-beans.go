@@ -503,6 +503,52 @@ func completionsHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(completions)
 }
 
+func accountsHandler(w http.ResponseWriter, r *http.Request) {
+	c, err := ioutil.ReadFile(config.MainBeancountFile)
+	if err != nil {
+		log.Printf("%v", err)
+		return
+	}
+
+	data := []string{}
+	var matches [][]string
+
+	re := regexp.MustCompile(`\n[^ ]+ +open +([^ \n]+)`)
+
+	matches = re.FindAllStringSubmatch(string(c), -1)
+
+	for _, m := range matches {
+		data = append(data, m[1])
+	}
+
+	w.Header().Set("Content-type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.Encode(data)
+}
+
+func currenciesHandler(w http.ResponseWriter, r *http.Request) {
+	c, err := ioutil.ReadFile(config.MainBeancountFile)
+	if err != nil {
+		log.Printf("%v", err)
+		return
+	}
+
+	data := []string{}
+	var matches [][]string
+
+	re := regexp.MustCompile(`\noption "operating_currency" +"([^ \n]+)"`)
+
+	matches = re.FindAllStringSubmatch(string(c), -1)
+
+	for _, m := range matches {
+		data = append(data, m[1])
+	}
+
+	w.Header().Set("Content-type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.Encode(data)
+}
+
 func figletString(text string) string {
 	ascii := figlet4go.NewAsciiRender()
 	renderStr, _ := ascii.Render(text)
@@ -514,7 +560,9 @@ func startServer(port int) {
 
 	router.HandleFunc("/", indexHandler).Methods("GET")
 	router.HandleFunc("/save-transaction", saveTransactionHandler).Methods("POST")
-	router.HandleFunc("/completions", completionsHandler).Methods("GET")
+	router.HandleFunc("/completions.json", completionsHandler).Methods("GET")
+	router.HandleFunc("/accounts.json", accountsHandler).Methods("GET")
+	router.HandleFunc("/currencies.json", currenciesHandler).Methods("GET")
 
 	n := MyClassic()
 	n.UseHandler(router)

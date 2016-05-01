@@ -25,5 +25,7 @@ bills-to-beans
 # bower_components
 /public/bower_components
 # temp
+*.beancount
 /bills
 /testbills
+config.yml
