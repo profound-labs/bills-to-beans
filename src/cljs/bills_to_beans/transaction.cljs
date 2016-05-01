@@ -1,4 +1,4 @@
-(ns bills-to-beans.bill
+(ns bills-to-beans.transaction
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [reagent.core :as r :refer [atom]]
             [reagent.format :refer [format]]

@@ -1,7 +1,7 @@
 (ns bills-to-beans.core
     (:require [reagent.core :as r :refer [atom]]
               [reagent.session :as session]
-              [bills-to-beans.bill :refer [<new-transaction-page>]]
+              [bills-to-beans.transaction :refer [<new-transaction-page>]]
               [secretary.core :as secretary :include-macros true]
               [clojure.string :as string]))
 
