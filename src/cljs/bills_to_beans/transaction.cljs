@@ -7,6 +7,7 @@
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
             [bills-to-beans.helpers :refer [flash!]]
+            [bills-to-beans.documents :refer [<document-upload>]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
@@ -21,7 +22,7 @@
                               :link nil
                               :postings [{:account "Assets:PT:Bank:Current" :amount "-0.00" :currency "EUR"}
                                          {:account "Expenses:General" :amount "0.00" :currency "EUR"}]
-                              :documents [{:path nil :size nil}]})
+                              :documents [{:filename nil :size nil}]})
 
 (defonce transaction-data (r/atom default-transaction))
 
@@ -41,8 +42,9 @@
 
 (defn not-zero? [korks error-message]
   (fn [cursor]
-    (when (or (nil? (get-in cursor korks)) (= 0 (get-in cursor korks)))
-      (v/validation-error [korks] error-message))))
+    (let [n (get-in cursor korks)]
+      (when (or (nil? n) (= n 0) (= (js/parseFloat n) 0.00))
+       (v/validation-error [korks] error-message)))))
 
 (defn <new-transaction-page> []
   (let [transaction-ui-state (r/atom {})
@@ -122,6 +124,9 @@
                             (if (string/blank? @narration)
                               "New Transaction"
                               @narration)]]
+                          [:div.row
+                           [:h1.col-sm-12
+                            [<document-upload> transaction-data]]]
                           [:div.row
                            [:div.col-sm-12
                             [<new-transaction-form> transaction-data transaction-ui-state]]]

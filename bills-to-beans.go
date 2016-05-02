@@ -73,7 +73,6 @@ type Document struct {
 	Date    time.Time `json:"date"`
 	Account string    `json:"account"`
 	Path    string    `json:"path"`
-	Saved   bool      `json:"saved"`
 }
 
 type Posting struct {
@@ -83,15 +82,19 @@ type Posting struct {
 	Currency string  `json:"currency"`
 }
 
+type TxnDocument struct {
+	Filename string `json:"filename"`
+}
+
 type Transaction struct {
-	Date      time.Time  `json:"date"`
-	Flag      string     `json:"flag"`
-	Payee     string     `json:"payee"`
-	Narration string     `json:"narration"`
-	Tags      []string   `json:"tags"`
-	Link      string     `json:"link"`
-	Postings  []Posting  `json:"postings"`
-	Documents []Document `json:"documents"`
+	Date      time.Time     `json:"date"`
+	Flag      string        `json:"flag"`
+	Payee     string        `json:"payee"`
+	Narration string        `json:"narration"`
+	Tags      []string      `json:"tags"`
+	Link      string        `json:"link"`
+	Postings  []Posting     `json:"postings"`
+	Documents []TxnDocument `json:"documents"`
 	DirPath   string
 }
 
@@ -104,6 +107,25 @@ type Balance struct {
 	Padded        bool      `json:"padded"`
 }
 
+func sanitizeFilename(text string) string {
+	out := regexp.MustCompile(`[^\w\.\'ãÃáÁíÍêÊéÉçÇ-]`).ReplaceAllString(text, " ")
+	out = regexp.MustCompile(`  +`).ReplaceAllString(out, " ")
+	return out
+}
+
+// Check if a path exists
+// http://stackoverflow.com/a/10510783/195141
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
+
 func (d Document) String() string {
 	return fmt.Sprintf(
 		"%s document %s %s",
@@ -111,6 +133,26 @@ func (d Document) String() string {
 		d.Account,
 		`"`+d.Path+`"`,
 	)
+}
+
+// http://stackoverflow.com/a/21061062/195141
+func (d TxnDocument) Copy(dst string) error {
+	in, err := os.Open(filepath.Join(appTempDir, d.Filename))
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	cerr := out.Close()
+	if err != nil {
+		return err
+	}
+	return cerr
 }
 
 func (b Balance) String() string {
@@ -205,12 +247,6 @@ func (t Transaction) sumAmountFmt() string {
 	return ""
 }
 
-func sanitizeFilename(text string) string {
-	out := regexp.MustCompile(`[^\w\.\'ãÃáÁíÍêÊéÉçÇ-]`).ReplaceAllString(text, " ")
-	out = regexp.MustCompile(`  +`).ReplaceAllString(out, " ")
-	return out
-}
-
 func (t Transaction) sanitizedBase() string {
 	var parts []string
 	if len(t.Payee) > 0 {
@@ -228,19 +264,6 @@ func (t Transaction) sanitizedBase() string {
 		}
 	}
 	return sanitizeFilename(s.Join(parts, " _ "))
-}
-
-// Check if a path exists
-// http://stackoverflow.com/a/10510783/195141
-func exists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return true, err
 }
 
 func (t *Transaction) EnsureDirPath() error {
@@ -322,42 +345,15 @@ func (t *Transaction) ParseBeancount(text string) error {
 	return nil
 }
 
-// http://stackoverflow.com/a/21061062/195141
-func (d Document) Copy(dst string) error {
-	in, err := os.Open(d.Path)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	cerr := out.Close()
-	if err != nil {
-		return err
-	}
-	return cerr
-}
-
-func (t Transaction) SaveDocuments() error {
+func (t *Transaction) SaveTxnDocuments() error {
 	var err error
 
-	for idx, doc := range t.Documents {
-		if !doc.Saved {
-			newpath := filepath.Join(
-				t.DirPath,
-				fmt.Sprintf("doc%d%s", idx+1, filepath.Ext(doc.Path)),
-			)
-			err = doc.Copy(newpath)
-			if err != nil {
-				return err
-			}
-			doc.Path = newpath
-			doc.Saved = true
-			t.Documents[idx] = doc
+	for _, doc := range t.Documents {
+		// TODO check if filename already exists
+		newpath := filepath.Join(t.DirPath, doc.Filename)
+		err = doc.Copy(newpath)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -375,31 +371,10 @@ func (t *Transaction) Save() error {
 		return err
 	}
 
-	if err = t.SaveDocuments(); err != nil {
+	if err = t.SaveTxnDocuments(); err != nil {
 		return err
 	}
 
-	return nil
-}
-
-// TODO
-func (t Balance) Save() error {
-	return nil
-}
-
-// TODO
-func (t Document) Save() error {
-	return nil
-}
-
-// TODO
-// return interface slice?
-func DirectivesFromBills() []Transaction {
-	return nil
-}
-
-// TODO
-func UpdateMainBeancount() error {
 	return nil
 }
 
@@ -426,7 +401,7 @@ func GetLocalIP() string {
 	return ""
 }
 
-func sendError(w http.ResponseWriter, status string, err error) {
+func sendError(w http.ResponseWriter, err error) {
 	data := make(map[string]interface{})
 	msg := fmt.Sprintf("%v", err)
 	log.Println(msg)
@@ -458,6 +433,7 @@ type auxiliary_txn struct {
 	Payee     string              `json:"payee"`
 	Narration string              `json:"narration"`
 	Postings  []auxiliary_posting `json:"postings"`
+	Documents []TxnDocument       `json:"documents"`
 }
 
 func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
@@ -468,17 +444,26 @@ func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	var aux_txn auxiliary_txn
 
 	if err := decoder.Decode(&aux_txn); err != nil {
-		sendError(w, "500", err)
+		sendError(w, err)
 		return
 	}
 
 	date, _ := time.Parse("2006-01-02", aux_txn.Date[0:10])
+
+	// Filter out empty docs
+	documents := []TxnDocument{}
+	for _, doc := range aux_txn.Documents {
+		if len(doc.Filename) > 0 {
+			documents = append(documents, doc)
+		}
+	}
 
 	txn := Transaction{
 		Date:      date,
 		Flag:      aux_txn.Flag,
 		Payee:     s.Replace(aux_txn.Payee, `"`, `'`, -1),
 		Narration: s.Replace(aux_txn.Narration, `"`, `'`, -1),
+		Documents: documents,
 	}
 
 	for _, p := range aux_txn.Postings {
@@ -494,7 +479,7 @@ func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := txn.Save(); err != nil {
-		sendError(w, "500", err)
+		sendError(w, err)
 		return
 	}
 
@@ -569,7 +554,7 @@ func completionsHandler(w http.ResponseWriter, r *http.Request) {
 func accountsHandler(w http.ResponseWriter, r *http.Request) {
 	c, err := ioutil.ReadFile(config.MainBeancountFile)
 	if err != nil {
-		sendError(w, "500", err)
+		sendError(w, err)
 		return
 	}
 
@@ -592,7 +577,7 @@ func accountsHandler(w http.ResponseWriter, r *http.Request) {
 func currenciesHandler(w http.ResponseWriter, r *http.Request) {
 	c, err := ioutil.ReadFile(config.MainBeancountFile)
 	if err != nil {
-		sendError(w, "500", err)
+		sendError(w, err)
 		return
 	}
 
@@ -612,6 +597,55 @@ func currenciesHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	var err error
+
+	r.ParseMultipartForm(32 << 20) // using 32 MB memory
+
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		sendError(w, err)
+		return
+	}
+	defer file.Close()
+
+	//ct := handler.Header.Get("Content-Type")
+	//
+	//if !(ct == "image/png" || ct == "image/jpeg") {
+	//	err = errors.New("must be png or jpeg")
+	//	fmt.Println(err)
+	//	return
+	//}
+
+	path := filepath.Join(appTempDir, handler.Filename)
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		sendError(w, err)
+		return
+	}
+	defer f.Close()
+
+	if _, err = io.Copy(f, file); err != nil {
+		sendError(w, err)
+		return
+	}
+
+	data := make(map[string]interface{})
+	info, _ := f.Stat()
+	data["filename"] = filepath.Base(path)
+	data["size"] = info.Size()
+
+	// Simulate waiting time for upload during development
+	if developmentMode {
+		time.Sleep(time.Duration(3) * time.Second)
+	}
+
+	w.Header().Set("Content-type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.Encode(data)
+}
+
 func figletString(text string) string {
 	ascii := figlet4go.NewAsciiRender()
 	renderStr, _ := ascii.Render(text)
@@ -623,6 +657,7 @@ func startServer(port int) {
 
 	router.HandleFunc("/", indexHandler).Methods("GET")
 	router.HandleFunc("/save-transaction", saveTransactionHandler).Methods("POST")
+	router.HandleFunc("/upload", uploadHandler).Methods("POST")
 	router.HandleFunc("/completions.json", completionsHandler).Methods("GET")
 	router.HandleFunc("/accounts.json", accountsHandler).Methods("GET")
 	router.HandleFunc("/currencies.json", currenciesHandler).Methods("GET")

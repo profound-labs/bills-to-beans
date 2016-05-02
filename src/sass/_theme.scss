@@ -9,6 +9,7 @@ body {
     left: 0px;
     padding: 1em;
     margin: 0px auto;
+    z-index: 999;
 }
 
 .table {
@@ -37,10 +38,6 @@ body {
     color: lighten($gray-light, 5%);
 }
 
-h1 {
-    margin-bottom: 2em;    
-}
-
 .form-control {
     border-bottom: 1px solid lighten($gray-light, 5%);
     box-shadow: none;
@@ -51,10 +48,10 @@ input, select {
     font-family: "monospace";
 }
 
-input[type="file"].image-input {
+input[type="file"].file-input {
     display: none;
 }
-.image-file-upload {
+.document-file-upload {
     border-color: transparent;
     color: #fff;
     background-color: #DF691A;
