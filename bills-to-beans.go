@@ -234,15 +234,24 @@ func (t Transaction) String() string {
 
 func (t Transaction) sumAmountFmt() string {
 	// No postings, 0 amount
+	// TODO have config for default currency
 	if len(t.Postings) == 0 {
-		return "0.00 EUR"
+		return "€0.00"
 	}
 
-	// 1 or 2 postings, first is the amount
+	// 1 or 2 postings, take abs of first for the amount
 	if len(t.Postings) <= 2 {
-		return fmt.Sprintf("%.2f %s",
-			math.Abs(t.Postings[0].Amount),
-			t.Postings[0].Currency)
+		currency := ""
+		switch t.Postings[0].Currency {
+		case "EUR":
+			currency = "€"
+		case "GBP":
+			currency = "£"
+		case "USD":
+			currency = "$"
+		}
+
+		return fmt.Sprintf("%s%.2f %s", currency, math.Abs(t.Postings[0].Amount))
 	}
 	return ""
 }
