@@ -147,7 +147,7 @@ func TestTransactionSave(t *testing.T) {
 	config.BillsFolder = "./testbills"
 	defer os.RemoveAll(config.BillsFolder)
 
-	transaction.Save()
+	transaction.Save(config)
 
 	// there should be a beancount file
 	path := filepath.Join(transaction.DirPath, transaction.BeancountFilename())

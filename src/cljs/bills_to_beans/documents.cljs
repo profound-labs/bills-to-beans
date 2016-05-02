@@ -85,8 +85,11 @@
           ;; Upload button
           [:tr
            [:td
-            [:label.document-file-upload {:for field-name}
-             [:i.fa.fa-fw.fa-file]]
+            [:button.btn.btn-primary {:style {:padding "0px"}
+                                      ;; TODO click label
+                                      :on-click (fn [e] (prn "click label"))}
+             [:label.document-file-upload {:for field-name :style {:margin "2px"}}
+              [:i.fa.fa-2x.fa-fw.fa-file]]]
             [:input.file-input
              {:type "file"
               :id field-name
