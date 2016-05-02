@@ -394,7 +394,7 @@ func (t *Transaction) SaveTxnDocuments() error {
 	return nil
 }
 
-func (t *Transaction) Save(c config) error {
+func (t *Transaction) Save(c conf) error {
 	var err error
 
 	if err = t.EnsureDirPath(); err != nil {

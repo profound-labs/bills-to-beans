@@ -20,6 +20,37 @@
 (defn update-document-data! [data document file-id]
   (swap! data update-in [:documents file-id] (fn [_] document)))
 
+(def date-regex #"^(\d{4})-*(\d{2})-*(\d{2})")
+
+(def amount-regex #"([0-9\.,€£\$]+)\.[^\.]+$")
+
+(defn get-date-from-the-beginning [filename]
+  (if-let [m (first (re-seq date-regex filename))]
+    (format "%s-%s-%s" (m 1) (m 2) (m 3))))
+
+(defn get-amount-from-the-end [filename]
+  (if-let [m (first (re-seq amount-regex filename))]
+    (-> (m 1)
+        (string/replace #"^[,€£\$]" "")
+        (string/replace #"[,€£\$]$" "")
+        (string/replace #"[,€£\$]" "."))))
+
+(defn get-narration-from-the-middle [filename]
+  (-> filename
+      (string/replace date-regex "")
+      (string/replace amount-regex "")
+      (string/trim)))
+
+(defn parse-filename! [data filename]
+  (if-let [date (get-date-from-the-beginning filename)]
+    (swap! data assoc :date date))
+  (if-let [amount (get-amount-from-the-end filename)]
+    (do
+      (swap! data update-in [:postings 0 :amount] (fn [_] (* -1 amount)))
+      (swap! data update-in [:postings 1 :amount] (fn [_] amount))))
+  (if-let [narration (get-narration-from-the-middle filename)]
+    (swap! data assoc :narration narration)))
+
 (defn <document-input> [data file-id]
   (let [field-name (str "document_file" file-id)
         uploading? (r/atom false)
@@ -33,9 +64,10 @@
                                                   {:multipart-params [["file" file]]}))]
 
                                 (if (:success response)
-                                  (do
+                                  (let [document (:body response)]
                                     (reset! uploading? false)
-                                    (update-document-data! data (:body response) file-id))
+                                    (update-document-data! data document file-id)
+                                    (parse-filename! data (:filename document)))
                                   (flash! response)
                                   ))))))
         filename (r/cursor data [:documents file-id :filename])
