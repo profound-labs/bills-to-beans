@@ -101,7 +101,7 @@ func TestSanitizedBase(t *testing.T) {
 		},
 	}
 
-	expect := `2016-02-12 _ Café de 'João' _ dois X café por cabeça _ 5.50 EUR`
+	expect := `2016-02-12 _ Café de 'João' _ dois X café por cabeça _ €5.50`
 	res := txn.sanitizedBase()
 
 	if res != expect {
@@ -117,7 +117,7 @@ func TestSanitizedBase(t *testing.T) {
 		},
 	}
 
-	expect = `2016-02-12 _ dois X café por cabeça _ 5.50 EUR`
+	expect = `2016-02-12 _ dois X café por cabeça _ €5.50`
 	res = txn.sanitizedBase()
 
 	if res != expect {
@@ -136,20 +136,21 @@ func TestTransactionSave(t *testing.T) {
 			Posting{Account: "Assets:Bank:Checking", Amount: -5.50, Currency: "EUR"},
 			Posting{Account: "Expenses:Coffee"},
 		},
-		Documents: []Document{
-			Document{Path: "./testdata/bill-one.png", Saved: false},
-			Document{Path: "./testdata/bill-two.jpg", Saved: false},
-			Document{Path: "./testdata/some-doc.pdf", Saved: false},
+		Documents: []TxnDocument{
+			TxnDocument{Filename: "bill-one.png"},
+			TxnDocument{Filename: "bill-two.jpg"},
+			TxnDocument{Filename: "some-doc.pdf"},
 		},
 	}
 
+	appTempDir = "./testdata"
 	config.BillsFolder = "./testbills"
 	defer os.RemoveAll(config.BillsFolder)
 
 	transaction.Save()
 
 	// there should be a beancount file
-	path := filepath.Join(transaction.DirPath(), transaction.BeancountFilename())
+	path := filepath.Join(transaction.DirPath, transaction.BeancountFilename())
 
 	text, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -165,7 +166,7 @@ func TestTransactionSave(t *testing.T) {
 	count := 0
 
 	for _, doc := range transaction.Documents {
-		f, err := os.Open(filepath.Join(transaction.DirPath(), filepath.Base(doc.Path)))
+		f, err := os.Open(filepath.Join(transaction.DirPath, doc.Filename))
 		defer f.Close()
 		if err != nil {
 			t.Errorf("hey: %v", err)

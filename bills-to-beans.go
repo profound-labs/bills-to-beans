@@ -108,7 +108,7 @@ type Balance struct {
 }
 
 func sanitizeFilename(text string) string {
-	out := regexp.MustCompile(`[^\w\.\'ãÃáÁíÍêÊéÉçÇ-]`).ReplaceAllString(text, " ")
+	out := regexp.MustCompile(`[^\w\.\'ãÃáÁíÍêÊéÉçÇ€£\$-]`).ReplaceAllString(text, " ")
 	out = regexp.MustCompile(`  +`).ReplaceAllString(out, " ")
 	return out
 }
@@ -251,7 +251,7 @@ func (t Transaction) sumAmountFmt() string {
 			currency = "$"
 		}
 
-		return fmt.Sprintf("%s%.2f %s", currency, math.Abs(t.Postings[0].Amount))
+		return fmt.Sprintf("%s%.2f", currency, math.Abs(t.Postings[0].Amount))
 	}
 	return ""
 }
