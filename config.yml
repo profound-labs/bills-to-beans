@@ -1,3 +1,0 @@
-bills_folder: ./bills
-main_billcount_file: bills.beancount
-server_port: 3030

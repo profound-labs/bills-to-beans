@@ -1,6 +1,7 @@
 package main
 
 import (
+	//"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -53,15 +54,15 @@ func TestTransactionString(t *testing.T) {
 		Date:      isodate("2016-02-12"),
 		Payee:     `Café de 'João'`,
 		Narration: `dois "X" café por cabeça`,
-		Tags:      []string{"coffee", "portugal"},
-		Link:      "holiday-2016",
+		Tags:      []string{"#coffee", "#portugal"},
+		Link:      "^holiday-2016",
 		Postings: []Posting{
 			Posting{Account: "Assets:Bank:Checking", Amount: -5.50, Currency: "EUR"},
 			Posting{Account: "Expenses:Coffee"},
 		},
 	}
 
-	expect = `2016-02-12 * "Café de 'João'" "dois \"X\" café por cabeça" #coffee #portugal ^holiday-2016
+	expect = `2016-02-12 * "Café de 'João'" "dois 'X' café por cabeça" #coffee #portugal ^holiday-2016
 Assets:Bank:Checking -5.50 EUR
 Expenses:Coffee`
 
@@ -100,8 +101,24 @@ func TestSanitizedBase(t *testing.T) {
 		},
 	}
 
-	expect := `2016-02-12 _ Café de 'João' _ dois X café por cabeça _ -5.50 EUR`
+	expect := `2016-02-12 _ Café de 'João' _ dois X café por cabeça _ €5.50`
 	res := txn.sanitizedBase()
+
+	if res != expect {
+		t.Errorf("hey: %s", res)
+	}
+
+	txn = Transaction{
+		Date:      isodate("2016-02-12"),
+		Narration: `dois "X" café por cabeça`,
+		Postings: []Posting{
+			Posting{Account: "Assets:Bank:Checking", Amount: -5.50, Currency: "EUR"},
+			Posting{Account: "Expenses:Coffee"},
+		},
+	}
+
+	expect = `2016-02-12 _ dois X café por cabeça _ €5.50`
+	res = txn.sanitizedBase()
 
 	if res != expect {
 		t.Errorf("hey: %s", res)
@@ -119,20 +136,21 @@ func TestTransactionSave(t *testing.T) {
 			Posting{Account: "Assets:Bank:Checking", Amount: -5.50, Currency: "EUR"},
 			Posting{Account: "Expenses:Coffee"},
 		},
-		Documents: []Document{
-			Document{Path: "./testdata/bill-one.png", Saved: false},
-			Document{Path: "./testdata/bill-two.jpg", Saved: false},
-			Document{Path: "./testdata/some-doc.pdf", Saved: false},
+		Documents: []TxnDocument{
+			TxnDocument{Filename: "bill-one.png"},
+			TxnDocument{Filename: "bill-two.jpg"},
+			TxnDocument{Filename: "some-doc.pdf"},
 		},
 	}
 
+	appTempDir = "./testdata"
 	config.BillsFolder = "./testbills"
 	defer os.RemoveAll(config.BillsFolder)
 
 	transaction.Save()
 
 	// there should be a beancount file
-	path := filepath.Join(transaction.DirPath(), transaction.BeancountFilename())
+	path := filepath.Join(transaction.DirPath, transaction.BeancountFilename())
 
 	text, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -148,7 +166,7 @@ func TestTransactionSave(t *testing.T) {
 	count := 0
 
 	for _, doc := range transaction.Documents {
-		f, err := os.Open(filepath.Join(transaction.DirPath(), filepath.Base(doc.Path)))
+		f, err := os.Open(filepath.Join(transaction.DirPath, doc.Filename))
 		defer f.Close()
 		if err != nil {
 			t.Errorf("hey: %v", err)
@@ -161,3 +179,43 @@ func TestTransactionSave(t *testing.T) {
 		t.Errorf("hey: only %d out of %d documents were saved", count, len(transaction.Documents))
 	}
 }
+
+func TestParseBeancount(t *testing.T) {
+	var txn Transaction
+	var text string
+
+	text = `2016-02-12 * "Café de 'João'" "dois 'X' café por cabeça" #coffee #portugal ^holiday-2016
+Assets:Bank:Checking -5.50 EUR
+Expenses:Coffee`
+
+	txn.ParseBeancount(text)
+
+	switch {
+	case txn.Payee != "Café de 'João'",
+		txn.Narration != "dois 'X' café por cabeça",
+		txn.Tags[0] != "#coffee",
+		txn.Tags[1] != "#portugal",
+		txn.Link != "^holiday-2016":
+		t.Errorf("hey: %v", txn)
+	}
+
+	text = `2016-02-12 * "dois 'X' café por cabeça" #coffee #portugal ^holiday-2016
+Assets:Bank:Checking -5.50 EUR
+Expenses:Coffee`
+
+	txn = Transaction{}
+	txn.ParseBeancount(text)
+
+	if txn.Narration != "dois 'X' café por cabeça" {
+		t.Errorf("hey: %v", txn)
+	}
+
+}
+
+//func TestCompletions(t *testing.T) {
+//	config.readConf()
+//	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
+//	//spew.Dump(globpath)
+//	files, _ := filepath.Glob(globpath)
+//	//spew.Dump(files)
+//}
