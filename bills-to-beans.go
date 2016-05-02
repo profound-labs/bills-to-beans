@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/codegangsta/negroni"
-	//"github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/getwe/figlet4go"
 	"github.com/gorilla/mux"
 	"github.com/skratchdot/open-golang/open"
@@ -348,7 +348,7 @@ func (t *Transaction) ParseBeancount(text string) error {
 	text = s.TrimSpace(text)
 	firstLine := s.TrimSpace(s.Split(text, "\n")[0])
 
-	re := regexp.MustCompile(`^([^ ]+) ([\*\!]) +("[^"]+")? +("[^"]+")?`)
+	re := regexp.MustCompile(`^([^ ]+) ([\*\!]) *("[^"]+")? *("[^"]+")?`)
 	matches := re.FindStringSubmatch(firstLine)
 
 	if len(matches) > 0 {
@@ -394,7 +394,7 @@ func (t *Transaction) SaveTxnDocuments() error {
 	return nil
 }
 
-func (t *Transaction) Save() error {
+func (t *Transaction) Save(c config) error {
 	var err error
 
 	if err = t.EnsureDirPath(); err != nil {
@@ -406,6 +406,10 @@ func (t *Transaction) Save() error {
 	}
 
 	if err = t.SaveTxnDocuments(); err != nil {
+		return err
+	}
+
+	if err = c.updateMainBeancountFile(); err != nil {
 		return err
 	}
 
@@ -512,7 +516,7 @@ func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 
-	if err := txn.Save(); err != nil {
+	if err := txn.Save(config); err != nil {
 		sendError(w, err)
 		return
 	}
@@ -661,8 +665,51 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
-func (c conf) updateMainBeancountFile() {
-	return
+func (c conf) updateMainBeancountFile() error {
+	var err error
+
+	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
+	paths, _ := filepath.Glob(globpath)
+
+	var txnsTexts []string
+	var content []byte
+	var text string
+
+	for _, path := range paths {
+		content, _ = ioutil.ReadFile(path)
+		text = string(content)
+		txnsTexts = append(txnsTexts, text)
+	}
+
+	content, err = ioutil.ReadFile(config.MainBeancountFile)
+	if err != nil {
+		return err
+	}
+	text = string(content)
+
+	// TODO user config.BillsFolder
+	pre := `;; === Transactions from ./bills ===`
+	post := `;; === Transactions end ===`
+
+	// TODO review regexp
+	re := regexp.MustCompile(pre + `[^=]*` + post)
+	parts := re.Split(text, 2)
+
+	if len(parts) != 2 {
+		spew.Dump(parts)
+		return errors.New("couldn't find where to insert Transactions")
+	}
+
+	f, err := os.OpenFile(config.MainBeancountFile, os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	out := fmt.Sprintf("%s%s\n\n%s\n\n%s%s", parts[0], pre, s.Join(txnsTexts, "\n\n"), post, parts[1])
+	f.Write([]byte(out))
+
+	return nil
 }
 
 func (c conf) startServer() {
@@ -749,7 +796,10 @@ func main() {
 		// - start a server
 		// - open the browser
 		if c.NArg() < 1 {
-			config.updateMainBeancountFile()
+			if err = config.updateMainBeancountFile(); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
 			config.startServer()
 			config.openBrowser()
 		}
