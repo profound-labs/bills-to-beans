@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/codegangsta/negroni"
-	"github.com/davecgh/go-spew/spew"
+	//"github.com/davecgh/go-spew/spew"
 	"github.com/getwe/figlet4go"
 	"github.com/gorilla/mux"
 	"github.com/skratchdot/open-golang/open"
@@ -251,7 +251,7 @@ func (t Transaction) String() string {
 	out = s.TrimSpace(out)
 
 	for _, p := range t.Postings {
-		out = out + "\n" + p.String()
+		out = out + "\n  " + p.String()
 	}
 
 	return out
@@ -696,7 +696,6 @@ func (c conf) updateMainBeancountFile() error {
 	parts := re.Split(text, 2)
 
 	if len(parts) != 2 {
-		spew.Dump(parts)
 		return errors.New("couldn't find where to insert Transactions")
 	}
 
