@@ -126,6 +126,31 @@ func exists(path string) (bool, error) {
 	return true, err
 }
 
+// UniqStr returns a copy of the passed slice with only unique string results.
+// http://www.golangbootcamp.com/book/tricks_and_tips
+func UniqStr(col []string) []string {
+	m := map[string]struct{}{}
+	for _, v := range col {
+		if _, ok := m[v]; !ok {
+			m[v] = struct{}{}
+		}
+	}
+	list := make([]string, len(m))
+
+	i := 0
+	for v := range m {
+		list[i] = v
+		i++
+	}
+	return list
+}
+
+func figletString(text string) string {
+	ascii := figlet4go.NewAsciiRender()
+	renderStr, _ := ascii.Render(text)
+	return renderStr
+}
+
 func (d Document) String() string {
 	return fmt.Sprintf(
 		"%s document %s %s",
@@ -501,25 +526,6 @@ func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
-// UniqStr returns a copy of the passed slice with only unique string results.
-// http://www.golangbootcamp.com/book/tricks_and_tips
-func UniqStr(col []string) []string {
-	m := map[string]struct{}{}
-	for _, v := range col {
-		if _, ok := m[v]; !ok {
-			m[v] = struct{}{}
-		}
-	}
-	list := make([]string, len(m))
-
-	i := 0
-	for v := range m {
-		list[i] = v
-		i++
-	}
-	return list
-}
-
 func completionsHandler(w http.ResponseWriter, r *http.Request) {
 	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
 	paths, _ := filepath.Glob(globpath)
@@ -655,13 +661,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
-func figletString(text string) string {
-	ascii := figlet4go.NewAsciiRender()
-	renderStr, _ := ascii.Render(text)
-	return renderStr
+func (c conf) updateMainBeancountFile() {
+	return
 }
 
-func startServer(port int) {
+func (c conf) startServer() {
+	port := c.ServerPort
 	router := mux.NewRouter()
 
 	router.HandleFunc("/", indexHandler).Methods("GET")
@@ -679,20 +684,21 @@ func startServer(port int) {
 		log.Fatal(err)
 	}
 
-	// Open the browser
-	if !developmentMode {
-		err = open.Start(fmt.Sprintf("http://localhost:%d", port))
-		if err != nil {
-			log.Println(err)
-		}
-	}
-
 	// Print welcome message
 	fmt.Println(figletString("B2B"))
 	fmt.Println(fmt.Sprintf("Listening on http://localhost:%d", port))
 
 	// Start the blocking server loop.
 	log.Fatal(http.Serve(l, n))
+}
+
+func (c conf) openBrowser() {
+	if !developmentMode {
+		err := open.Start(fmt.Sprintf("http://localhost:%d", c.ServerPort))
+		if err != nil {
+			log.Println(err)
+		}
+	}
 }
 
 func cleanup() {
@@ -738,9 +744,14 @@ func main() {
 	}()
 
 	app.Action = func(c *cli.Context) {
-		// No arguments, start a server
+		// No arguments, so we're a desktop app
+		// - updated main beanfile
+		// - start a server
+		// - open the browser
 		if c.NArg() < 1 {
-			startServer(config.ServerPort)
+			config.updateMainBeancountFile()
+			config.startServer()
+			config.openBrowser()
 		}
 	}
 
