@@ -39,6 +39,7 @@ type conf struct {
 	BillsFolder       string `yaml:"bills_folder"`
 	MainBeancountFile string `yaml:"main_beancount_file"`
 	ServerPort        int    `yaml:"server_port"`
+	InlineBeancounts  bool   `yaml:inline_beancounts`
 }
 
 func (c *conf) readConf() *conf {
@@ -46,6 +47,7 @@ func (c *conf) readConf() *conf {
 		BillsFolder:       "./bills",
 		MainBeancountFile: "./bills.beancount",
 		ServerPort:        3030,
+		InlineBeancounts:  false,
 	}
 
 	yamlFile, err := ioutil.ReadFile("config.yml")
@@ -676,8 +678,12 @@ func (c conf) updateMainBeancountFile() error {
 	var text string
 
 	for _, path := range paths {
-		content, _ = ioutil.ReadFile(path)
-		text = string(content)
+		if c.InlineBeancounts {
+			content, _ = ioutil.ReadFile(path)
+			text = string(content) + "\n"
+		} else {
+			text = fmt.Sprintf(`include "%s"`, path)
+		}
 		txnsTexts = append(txnsTexts, text)
 	}
 
@@ -705,7 +711,7 @@ func (c conf) updateMainBeancountFile() error {
 	}
 	defer f.Close()
 
-	out := fmt.Sprintf("%s%s\n\n%s\n\n%s%s", parts[0], pre, s.Join(txnsTexts, "\n\n"), post, parts[1])
+	out := fmt.Sprintf("%s%s\n\n%s\n\n%s%s", parts[0], pre, s.Join(txnsTexts, "\n"), post, parts[1])
 	f.Write([]byte(out))
 
 	return nil
