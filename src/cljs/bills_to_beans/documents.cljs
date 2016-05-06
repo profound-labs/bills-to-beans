@@ -22,7 +22,7 @@
 
 (def date-regex #"^(\d{4})-*(\d{2})-*(\d{2})")
 
-(def amount-regex #"([0-9\.,€£\$]+)\.[^\.]+$")
+(def amount-regex #"([0-9\.,€£\$]+) *\.[^\.]+$")
 
 (defn get-date-from-the-beginning [filename]
   (if-let [m (first (re-seq date-regex filename))]
@@ -39,7 +39,8 @@
   (-> filename
       (string/replace date-regex "")
       (string/replace amount-regex "")
-      (string/trim)))
+      (string/replace #"^[ _-]" "")
+      (string/replace #"[ _-]$" "")))
 
 (defn parse-filename! [data filename]
   (if-let [date (get-date-from-the-beginning filename)]
