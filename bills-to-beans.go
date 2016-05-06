@@ -218,14 +218,22 @@ func (p Posting) String() string {
 }
 
 func (t Transaction) titleFmt() string {
-	var out []string
-	if len(t.Payee) > 0 {
-		out = append(out, `"`+s.Replace(t.Payee, `"`, `'`, -1)+`"`)
+	payee := s.Replace(t.Payee, `"`, `'`, -1)
+	narration := s.Replace(t.Narration, `"`, `'`, -1)
+
+	if len(payee) == 0 && len(narration) == 0 {
+		return ""
 	}
-	if len(t.Narration) > 0 {
-		out = append(out, `"`+s.Replace(t.Narration, `"`, `'`, -1)+`"`)
+
+	// Fava adds a | between payee and narration:
+	// [[Payee] \| Narration]
+
+	// if there is a payee, there must be a narration too
+	if len(payee) > 0 {
+		return fmt.Sprintf(`"%s" | "%s"`, payee, narration)
 	}
-	return s.Join(out, " ")
+
+	return fmt.Sprintf(`"%s"`, narration)
 }
 
 func (t Transaction) flagFmt() string {

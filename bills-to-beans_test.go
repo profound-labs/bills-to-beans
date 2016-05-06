@@ -62,9 +62,9 @@ func TestTransactionString(t *testing.T) {
 		},
 	}
 
-	expect = `2016-02-12 * "Café de 'João'" "dois 'X' café por cabeça" #coffee #portugal ^holiday-2016
-Assets:Bank:Checking -5.50 EUR
-Expenses:Coffee`
+	expect = `2016-02-12 * "Café de 'João'" | "dois 'X' café por cabeça" #coffee #portugal ^holiday-2016
+  Assets:Bank:Checking -5.50 EUR
+  Expenses:Coffee`
 
 	res = transaction.String()
 
