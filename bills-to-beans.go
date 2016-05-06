@@ -111,7 +111,7 @@ type Balance struct {
 }
 
 func sanitizeFilename(text string) string {
-	out := regexp.MustCompile(`[^\w\.\'ãÃáÁíÍêÊéÉçÇ€£\$-]`).ReplaceAllString(text, " ")
+	out := regexp.MustCompile(`[^\w\.\'ãÃõÕáÁâÂíÍóÓêÊôÔéÉçÇ€£\$-]`).ReplaceAllString(text, " ")
 	out = regexp.MustCompile(`  +`).ReplaceAllString(out, " ")
 	return out
 }
