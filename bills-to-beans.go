@@ -77,6 +77,12 @@ type Document struct {
 	Path    string    `json:"path"`
 }
 
+type Note struct {
+	Date        time.Time `json:"date"`
+	Account     string    `json:"account"`
+	Description `json:"description"`
+}
+
 type Posting struct {
 	Flag      string  `json:"flag"`
 	Account   string  `json:"account"`
@@ -110,8 +116,15 @@ type Balance struct {
 	Padded        bool      `json:"padded"`
 }
 
+type Bill struct {
+	Transactions []Transaction `json:"transactions"`
+	Balances     []Balance     `json:"balances"`
+	Documents    []Document    `json:"documents"`
+	Notes        []Note        `json:"notes"`
+}
+
 func sanitizeFilename(text string) string {
-	out := regexp.MustCompile(`[^\w\.\'ãÃáÁíÍêÊéÉçÇ€£\$-]`).ReplaceAllString(text, " ")
+	out := regexp.MustCompile(`[^\w\.\'ãÃõÕáÁâÂíÍóÓêÊôÔéÉçÇ€£\$-]`).ReplaceAllString(text, " ")
 	out = regexp.MustCompile(`  +`).ReplaceAllString(out, " ")
 	return out
 }
