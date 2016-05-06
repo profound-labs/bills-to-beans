@@ -751,7 +751,7 @@ func (c conf) updateMainBeancountFile() error {
 	return nil
 }
 
-func (c conf) startServer() {
+func (c conf) startWebApp() {
 	port := c.ServerPort
 	router := mux.NewRouter()
 
@@ -774,16 +774,19 @@ func (c conf) startServer() {
 	fmt.Println(figletString("B2B"))
 	fmt.Println(fmt.Sprintf("Listening on http://localhost:%d", port))
 
+	config.openBrowser()
+
 	// Start the blocking server loop.
 	log.Fatal(http.Serve(l, n))
 }
 
 func (c conf) openBrowser() {
-	if !developmentMode {
-		err := open.Start(fmt.Sprintf("http://localhost:%d", c.ServerPort))
-		if err != nil {
-			log.Println(err)
-		}
+	if developmentMode {
+		return
+	}
+	err := open.Start(fmt.Sprintf("http://localhost:%d", c.ServerPort))
+	if err != nil {
+		log.Println(err)
 	}
 }
 
@@ -830,17 +833,13 @@ func main() {
 	}()
 
 	app.Action = func(c *cli.Context) {
-		// No arguments, so we're a desktop app
-		// - updated main beanfile
-		// - start a server
-		// - open the browser
+		// No arguments, so we're a desktop web app
 		if c.NArg() < 1 {
 			if err = config.updateMainBeancountFile(); err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
-			config.startServer()
-			config.openBrowser()
+			config.startWebApp()
 		}
 	}
 
