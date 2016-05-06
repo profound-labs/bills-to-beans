@@ -77,10 +77,22 @@ type Document struct {
 	Path    string    `json:"path"`
 }
 
+type auxiliary_document struct {
+	Date    string `json:"date"`
+	Account string `json:"account"`
+	Path    string `json:"path"`
+}
+
 type Note struct {
 	Date        time.Time `json:"date"`
 	Account     string    `json:"account"`
-	Description `json:"description"`
+	Description string    `json:"description"`
+}
+
+type auxiliary_note struct {
+	Date        string `json:"date"`
+	Account     string `json:"account"`
+	Description string `json:"description"`
 }
 
 type Posting struct {
@@ -89,6 +101,13 @@ type Posting struct {
 	Amount    float64 `json:"amount"`
 	Currency  string  `json:"currency"`
 	padlength int
+}
+
+type auxiliary_posting struct {
+	Flag     string `json:"flag"`
+	Account  string `json:"account"`
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
 }
 
 type TxnDocument struct {
@@ -107,6 +126,17 @@ type Transaction struct {
 	DirPath   string
 }
 
+type auxiliary_transaction struct {
+	Date      string              `json:"date"`
+	Flag      string              `json:"flag"`
+	Payee     string              `json:"payee"`
+	Narration string              `json:"narration"`
+	Tags      []string            `json:"tags"`
+	Link      string              `json:"link"`
+	Postings  []auxiliary_posting `json:"postings"`
+	Documents []TxnDocument       `json:"documents"`
+}
+
 type Balance struct {
 	Date          time.Time `json:"date"`
 	Amount        float64   `json:"amount"`
@@ -116,11 +146,27 @@ type Balance struct {
 	Padded        bool      `json:"padded"`
 }
 
+type auxiliary_balance struct {
+	Date          string `json:"date"`
+	Amount        string `json:"amount"`
+	Currency      string `json:"currency"`
+	SourceAccount string `json:"source_account"`
+	TargetAccount string `json:"target_account"`
+	Padded        bool   `json:"padded"`
+}
+
 type Bill struct {
 	Transactions []Transaction `json:"transactions"`
 	Balances     []Balance     `json:"balances"`
 	Documents    []Document    `json:"documents"`
 	Notes        []Note        `json:"notes"`
+}
+
+type auxiliary_bill struct {
+	Transactions []auxiliary_transaction `json:"transactions"`
+	Balances     []auxiliary_balance     `json:"balances"`
+	Documents    []auxiliary_document    `json:"documents"`
+	Notes        []auxiliary_note        `json:"notes"`
 }
 
 func sanitizeFilename(text string) string {
@@ -169,10 +215,10 @@ func figletString(text string) string {
 
 func (d Document) String() string {
 	return fmt.Sprintf(
-		"%s document %s %s",
+		"%s document %s %q",
 		d.Date.Format("2006-01-02"),
 		d.Account,
-		`"`+d.Path+`"`,
+		d.Path,
 	)
 }
 
@@ -507,28 +553,12 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, data)
 }
 
-type auxiliary_posting struct {
-	Flag     string `json:"flag"`
-	Account  string `json:"account"`
-	Amount   string `json:"amount"`
-	Currency string `json:"currency"`
-}
-
-type auxiliary_txn struct {
-	Date      string              `json:"date"`
-	Flag      string              `json:"flag"`
-	Payee     string              `json:"payee"`
-	Narration string              `json:"narration"`
-	Postings  []auxiliary_posting `json:"postings"`
-	Documents []TxnDocument       `json:"documents"`
-}
-
-func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
+func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	// Have to decode with auxiliary structs b/c date and numbers come as strings
 	// idea is from https://mlafeldt.github.io/blog/decoding-yaml-in-go/
-	var aux_txn auxiliary_txn
+	var aux_txn auxiliary_transaction
 
 	if err := decoder.Decode(&aux_txn); err != nil {
 		sendError(w, err)
@@ -769,8 +799,10 @@ func (c conf) startWebApp() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/", indexHandler).Methods("GET")
-	router.HandleFunc("/save-transaction", saveTransactionHandler).Methods("POST")
+
+	router.HandleFunc("/save-bill", saveBillHandler).Methods("POST")
 	router.HandleFunc("/upload", uploadHandler).Methods("POST")
+
 	router.HandleFunc("/completions.json", completionsHandler).Methods("GET")
 	router.HandleFunc("/accounts.json", accountsHandler).Methods("GET")
 	router.HandleFunc("/currencies.json", currenciesHandler).Methods("GET")
@@ -804,7 +836,7 @@ func (c conf) openBrowser() {
 }
 
 func cleanup() {
-	fmt.Println("removing temp folder")
+	log.Println("removing temp folder")
 	os.RemoveAll(appTempDir)
 }
 
