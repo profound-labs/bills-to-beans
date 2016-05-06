@@ -78,10 +78,11 @@ type Document struct {
 }
 
 type Posting struct {
-	Flag     string  `json:"flag"`
-	Account  string  `json:"account"`
-	Amount   float64 `json:"amount"`
-	Currency string  `json:"currency"`
+	Flag      string  `json:"flag"`
+	Account   string  `json:"account"`
+	Amount    float64 `json:"amount"`
+	Currency  string  `json:"currency"`
+	padlength int
 }
 
 type TxnDocument struct {
@@ -207,13 +208,27 @@ func (b Balance) String() string {
 	return s.Join(out, "\n\n")
 }
 
-func (p Posting) String() string {
+func (p Posting) accFmt() string {
 	out := fmt.Sprintf("%s %s", p.Flag, p.Account)
+	out = regexp.MustCompile(`  +`).ReplaceAllString(out, " ")
+	out = s.TrimSpace(out)
+	return out
+}
+
+func (p Posting) String() string {
+	var out string
+
+	out = p.accFmt()
+
+	if p.padlength > 0 {
+		for i := 0; len(out) < p.padlength; i++ {
+			out = out + " "
+		}
+	}
+
 	if p.Amount != 0.0 && len(p.Currency) > 0 {
 		out = out + fmt.Sprintf(" %.2f %s", p.Amount, p.Currency)
 	}
-	out = regexp.MustCompile(`  +`).ReplaceAllString(out, " ")
-	out = s.TrimSpace(out)
 	return out
 }
 
@@ -260,8 +275,19 @@ func (t Transaction) String() string {
 	out = out + regexp.MustCompile(`  +`).ReplaceAllString(s.Join(firstLineParts, " "), " ")
 	out = s.TrimSpace(out)
 
+	longest := 0
 	for _, p := range t.Postings {
-		out = out + "\n  " + p.String()
+		if len(p.accFmt()) > longest {
+			longest = len(p.accFmt())
+		}
+	}
+
+	for _, p := range t.Postings {
+		p.padlength = longest + 1
+		if p.Amount >= 0 {
+			p.padlength++
+		}
+		out = out + fmt.Sprintf("\n  %s", p.String())
 	}
 
 	return out

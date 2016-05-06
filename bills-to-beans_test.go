@@ -58,13 +58,17 @@ func TestTransactionString(t *testing.T) {
 		Link:      "^holiday-2016",
 		Postings: []Posting{
 			Posting{Account: "Assets:Bank:Checking", Amount: -5.50, Currency: "EUR"},
-			Posting{Account: "Expenses:Coffee"},
+			Posting{Account: "Assets:Bank:PettyCash", Amount: -2.50, Currency: "EUR"},
+			Posting{Account: "Expenses:Coffee", Amount: 5.50, Currency: "EUR"},
+			Posting{Account: "Expenses:Tips", Amount: 2.50, Currency: "EUR"},
 		},
 	}
 
 	expect = `2016-02-12 * "Café de 'João'" | "dois 'X' café por cabeça" #coffee #portugal ^holiday-2016
-  Assets:Bank:Checking -5.50 EUR
-  Expenses:Coffee`
+  Assets:Bank:Checking   -5.50 EUR
+  Assets:Bank:PettyCash  -2.50 EUR
+  Expenses:Coffee         5.50 EUR
+  Expenses:Tips           2.50 EUR`
 
 	res = transaction.String()
 
