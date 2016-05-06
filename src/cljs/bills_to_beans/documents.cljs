@@ -39,8 +39,8 @@
   (-> filename
       (string/replace date-regex "")
       (string/replace amount-regex "")
-      (string/replace #"^[ _-]" "")
-      (string/replace #"[ _-]$" "")))
+      (string/replace #"^[ _-]*" "")
+      (string/replace #"[ _-]*$" "")))
 
 (defn parse-filename! [data filename]
   (if-let [date (get-date-from-the-beginning filename)]
