@@ -10,7 +10,8 @@
 
 (defn <flash-message> []
   (let [class (if-let [class (:class (session/get :flash))] class "alert-info" )
-        message (:msg (session/get :flash))]
+        message (:msg (session/get :flash))
+        notice (:notice (session/get :flash))]
 
     (when (not (string/blank? message))
       [:div.alert.alert-dismissable
@@ -19,6 +20,8 @@
         [:span {:aria-hidden "true"} "×"]];; &times;
        (when (not (string/blank? message))
          [:span message])
+       (when notice
+         notice)
        ])
     ))
 

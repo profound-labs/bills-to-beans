@@ -638,8 +638,6 @@ func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 
 	var bill Bill
 
-	spew.Dump(aux_bill)
-
 	for _, aux_txn := range aux_bill.Transactions {
 		txn := aux_txn.ToTransaction()
 		bill.Transactions = append(bill.Transactions, txn)
@@ -650,11 +648,30 @@ func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	enc := json.NewEncoder(w)
-
 	data := make(map[string]interface{})
 	data["flash"] = "Saved"
 
+	data["dir_path"] = bill.DirPath
+
+	// can't do structs with keys, it only encodes as empty hashes
+	savedpaths := []string{}
+	savedsizes := []int64{}
+
+	filepath.Walk(
+		bill.DirPath,
+		func(path string, f os.FileInfo, err error) error {
+			if !f.IsDir() {
+				savedpaths = append(savedpaths, path)
+				savedsizes = append(savedsizes, f.Size())
+			}
+			return nil
+		},
+	)
+
+	data["saved_paths"] = savedpaths
+	data["saved_sizes"] = savedsizes
+
+	enc := json.NewEncoder(w)
 	w.Header().Set("Content-type", "application/json")
 	enc.Encode(data)
 }
@@ -837,6 +854,8 @@ func (c conf) updateMainBeancountFile() error {
 	pre := `;; === Beancounts from ./bills ===`
 	post := `;; === Beancounts end ===`
 
+	// FIXME already existing beancount inlcudes are not removed
+
 	// TODO review regexp
 	re := regexp.MustCompile(pre + `[^=]*` + post)
 	parts := re.Split(text, 2)
@@ -874,6 +893,8 @@ func (c conf) startWebApp() {
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatal(err)
+		// just to keep spew in the imports
+		spew.Dump(err)
 	}
 
 	// Print welcome message

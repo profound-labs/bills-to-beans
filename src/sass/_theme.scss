@@ -4,9 +4,9 @@ body {
 }
 
 #flash_wrap {
-    position: absolute;
-    top: 0px;
-    left: 0px;
+    position: fixed;
+    top: 10px;
+    left: 10px;
     padding: 1em;
     margin: 0px auto;
     z-index: 999;

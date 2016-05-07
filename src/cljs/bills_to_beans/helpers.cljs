@@ -7,11 +7,11 @@
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
 
-(defn flash! [resp]
+(defn flash! [resp & notice]
   (let [class (if (= 200 (:status resp)) "alert-info" "alert-warning")
         message (let [m (get-in resp [:body :flash])]
                   (if (string/blank? m) "Error" m))]
-    (session/put! :flash {:class class :msg message})))
+    (session/put! :flash {:class class :msg message :notice notice})))
 
 (defn get-resource! [url data & success-callback]
   (go (let [response (<! (http/get url))]

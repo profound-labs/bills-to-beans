@@ -16,9 +16,7 @@
 
 (declare <payees-list> <notes>)
 
-(defonce bill-data (r/atom {:transactions [{:data @default-transaction :ui {}}
-                                           {:data @default-transaction :ui {}}
-                                           {:data @default-transaction :ui {}}]
+(defonce bill-data (r/atom {:transactions [{:data @default-transaction :ui {}}]
                             :balances []
                             :notes []
                             :documents []
@@ -40,6 +38,21 @@
                         postings))))
        transactions))
 
+;; TODO fix warning about missing ^{:key}
+
+(defn <saved-files-notice> [dir_path saved_paths saved_sizes]
+  [:div
+   [:p dir_path]
+   [:table.table
+    [:tbody
+     (map-indexed
+      (fn [idx a]
+        ^{:key (str "files" idx)}
+        [:tr
+         [:td (a 0)]
+         [:td (a 1)]])
+      (map vector saved_paths saved_sizes))]]])
+
 (defn <new-bill-page> []
   (let [req-save (fn []
                    (http/post
@@ -53,11 +66,16 @@
                        (when (validate-all-transactions! bill-data)
                          (do (go (let [response (<! (req-save))]
                                    (if (:success response)
-                                     (do
+                                     (let [notice [<saved-files-notice>
+                                                   (get-in response [:body :dir_path])
+                                                   (get-in response [:body :saved_paths])
+                                                   (get-in response [:body :saved_sizes])]]
+
                                        (swap! bill-data
                                                 assoc :transactions
                                                 [{:data @default-transaction :ui {}}])
-                                       (flash! response))
+
+                                       (flash! response notice))
                                      (flash! response)
                                      ))))))]
 
