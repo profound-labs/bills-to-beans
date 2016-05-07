@@ -12,3 +12,16 @@
         message (let [m (get-in resp [:body :flash])]
                   (if (string/blank? m) "Error" m))]
     (session/put! :flash {:class class :msg message})))
+
+(defn get-resource! [url data & success-callback]
+  (go (let [response (<! (http/get url))]
+        (if (:success response)
+          ;; Assign response to atom and run callback
+          (let [res (:body response)]
+            (reset! data res)
+            (if (not (nil? success-callback))
+              ((first success-callback) res))
+            )
+          ;; Flash error
+          (flash! response)))))
+

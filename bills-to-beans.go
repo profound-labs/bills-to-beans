@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/codegangsta/negroni"
-	//"github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/getwe/figlet4go"
 	"github.com/gorilla/mux"
 	"github.com/skratchdot/open-golang/open"
@@ -123,7 +123,6 @@ type Transaction struct {
 	Link      string        `json:"link"`
 	Postings  []Posting     `json:"postings"`
 	Documents []TxnDocument `json:"documents"`
-	DirPath   string
 }
 
 type auxiliary_transaction struct {
@@ -160,6 +159,7 @@ type Bill struct {
 	Balances     []Balance     `json:"balances"`
 	Documents    []Document    `json:"documents"`
 	Notes        []Note        `json:"notes"`
+	DirPath      string
 }
 
 type auxiliary_bill struct {
@@ -395,35 +395,66 @@ func (t Transaction) sanitizedBase() string {
 	return sanitizeFilename(s.Join(parts, " _ "))
 }
 
-func (t *Transaction) EnsureDirPath() error {
-	var err error
+func (b Bill) String() string {
+	var strs []string
 
-	t.DirPath = filepath.Join(
-		config.BillsFolder,
-		fmt.Sprintf("%04d", t.Date.Year()),
-		fmt.Sprintf("%02d", t.Date.Month()),
-		t.sanitizedBase(),
-	)
-
-	if ex, _ := exists(t.DirPath); ex {
-		return errors.New(fmt.Sprintf("Already exists: %s", t.DirPath))
+	for _, txn := range b.Transactions {
+		strs = append(strs, txn.String())
 	}
 
-	if err = os.MkdirAll(t.DirPath, 0755); err != nil {
-		return err
+	for _, bal := range b.Balances {
+		strs = append(strs, bal.String())
+	}
+
+	// TODO
+	//for _, note := range b.Notes {
+	//	strs = append(strs, note.String())
+	//}
+
+	for _, doc := range b.Documents {
+		strs = append(strs, doc.String())
+	}
+
+	return s.Join(strs, "\n\n")
+}
+
+// Uses globals: config
+func (b *Bill) EnsureDirPath() error {
+	var err error
+
+	// Use the first Transaction
+
+	if len(b.Transactions) > 0 {
+		t := b.Transactions[0]
+		b.DirPath = filepath.Join(
+			config.BillsFolder,
+			fmt.Sprintf("%04d", t.Date.Year()),
+			fmt.Sprintf("%02d", t.Date.Month()),
+			t.sanitizedBase(),
+		)
+
+		if ex, _ := exists(b.DirPath); ex {
+			return errors.New(fmt.Sprintf("Already exists: %s", b.DirPath))
+		}
+
+		if err = os.MkdirAll(b.DirPath, 0755); err != nil {
+			return err
+		}
+	} else {
+		return errors.New(fmt.Sprintf("Need at least one transaction"))
 	}
 
 	return nil
 }
 
-func (t Transaction) BeancountFilename() string {
-	return "transaction.beancount"
+func (b Bill) BeancountFilename() string {
+	return "bill.beancount"
 }
 
-func (t *Transaction) SaveBeancount() error {
+func (b *Bill) SaveBeancount() error {
 	var err error
 
-	path := filepath.Join(t.DirPath, t.BeancountFilename())
+	path := filepath.Join(b.DirPath, b.BeancountFilename())
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
@@ -431,7 +462,7 @@ func (t *Transaction) SaveBeancount() error {
 	}
 	defer f.Close()
 
-	_, err = f.WriteString(t.String())
+	_, err = f.WriteString(b.String())
 	if err != nil {
 		return err
 	}
@@ -474,41 +505,79 @@ func (t *Transaction) ParseBeancount(text string) error {
 	return nil
 }
 
-func (t *Transaction) SaveTxnDocuments() error {
+// TODO
+//func (t *Transaction) SaveTxnDocuments() error {
+//	var err error
+//
+//	for _, doc := range t.Documents {
+//		// TODO check if filename already exists
+//		newpath := filepath.Join(t.DirPath, doc.Filename)
+//		err = doc.Copy(newpath)
+//		if err != nil {
+//			return err
+//		}
+//	}
+//
+//	return nil
+//}
+
+func (b *Bill) Save(c conf) error {
 	var err error
 
-	for _, doc := range t.Documents {
-		// TODO check if filename already exists
-		newpath := filepath.Join(t.DirPath, doc.Filename)
-		err = doc.Copy(newpath)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (t *Transaction) Save(c conf) error {
-	var err error
-
-	if err = t.EnsureDirPath(); err != nil {
+	if err = b.EnsureDirPath(); err != nil {
 		return err
 	}
 
-	if err = t.SaveBeancount(); err != nil {
+	if err = b.SaveBeancount(); err != nil {
 		return err
 	}
 
-	if err = t.SaveTxnDocuments(); err != nil {
-		return err
-	}
+	// TODO
+	//for _, t := range b.Transactions {
+	//	if err = t.SaveTxnDocuments(); err != nil {
+	//		return err
+	//	}
+	//}
 
 	if err = c.updateMainBeancountFile(); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (aux_txn auxiliary_transaction) ToTransaction() Transaction {
+	date, _ := time.Parse("2006-01-02", aux_txn.Date[0:10])
+
+	// Filter out empty docs
+	documents := []TxnDocument{}
+	for _, doc := range aux_txn.Documents {
+		if len(doc.Filename) > 0 {
+			documents = append(documents, doc)
+		}
+	}
+
+	txn := Transaction{
+		Date:      date,
+		Flag:      aux_txn.Flag,
+		Payee:     s.Replace(aux_txn.Payee, `"`, `'`, -1),
+		Narration: s.Replace(aux_txn.Narration, `"`, `'`, -1),
+		Documents: documents,
+	}
+
+	for _, p := range aux_txn.Postings {
+		amount, _ := strconv.ParseFloat(p.Amount, 64)
+		txn.Postings = append(txn.Postings,
+			Posting{
+				Flag:     p.Flag,
+				Account:  p.Account,
+				Amount:   amount,
+				Currency: p.Currency,
+			},
+		)
+	}
+
+	return txn
 }
 
 func MyClassic() *negroni.Negroni {
@@ -553,49 +622,30 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, data)
 }
 
+// Uses globals: config
 func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	// Have to decode with auxiliary structs b/c date and numbers come as strings
 	// idea is from https://mlafeldt.github.io/blog/decoding-yaml-in-go/
-	var aux_txn auxiliary_transaction
 
-	if err := decoder.Decode(&aux_txn); err != nil {
+	var aux_bill auxiliary_bill
+
+	if err := decoder.Decode(&aux_bill); err != nil {
 		sendError(w, err)
 		return
 	}
 
-	date, _ := time.Parse("2006-01-02", aux_txn.Date[0:10])
+	var bill Bill
 
-	// Filter out empty docs
-	documents := []TxnDocument{}
-	for _, doc := range aux_txn.Documents {
-		if len(doc.Filename) > 0 {
-			documents = append(documents, doc)
-		}
+	spew.Dump(aux_bill)
+
+	for _, aux_txn := range aux_bill.Transactions {
+		txn := aux_txn.ToTransaction()
+		bill.Transactions = append(bill.Transactions, txn)
 	}
 
-	txn := Transaction{
-		Date:      date,
-		Flag:      aux_txn.Flag,
-		Payee:     s.Replace(aux_txn.Payee, `"`, `'`, -1),
-		Narration: s.Replace(aux_txn.Narration, `"`, `'`, -1),
-		Documents: documents,
-	}
-
-	for _, p := range aux_txn.Postings {
-		amount, _ := strconv.ParseFloat(p.Amount, 64)
-		txn.Postings = append(txn.Postings,
-			Posting{
-				Flag:     p.Flag,
-				Account:  p.Account,
-				Amount:   amount,
-				Currency: p.Currency,
-			},
-		)
-	}
-
-	if err := txn.Save(config); err != nil {
+	if err := bill.Save(config); err != nil {
 		sendError(w, err)
 		return
 	}
@@ -609,15 +659,58 @@ func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
+func (c conf) getAccounts() (account []string, err error) {
+	content, err := ioutil.ReadFile(c.MainBeancountFile)
+	if err != nil {
+		return []string{}, err
+	}
+
+	data := []string{}
+	var matches [][]string
+
+	re := regexp.MustCompile(`\n[^ ]+ +open +([^ \n]+)`)
+
+	matches = re.FindAllStringSubmatch(string(content), -1)
+
+	for _, m := range matches {
+		data = append(data, m[1])
+	}
+
+	return data, nil
+}
+
+func (c conf) getCurrencies() (currencies []string, err error) {
+	content, err := ioutil.ReadFile(c.MainBeancountFile)
+	if err != nil {
+		return []string{}, err
+	}
+
+	data := []string{}
+	var matches [][]string
+
+	re := regexp.MustCompile(`\noption "operating_currency" +"([^ \n]+)"`)
+
+	matches = re.FindAllStringSubmatch(string(content), -1)
+
+	for _, m := range matches {
+		data = append(data, m[1])
+	}
+
+	return data, nil
+}
+
+// Uses globals: config
 func completionsHandler(w http.ResponseWriter, r *http.Request) {
 	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
 	paths, _ := filepath.Glob(globpath)
 
-	completions := make(map[string][]string)
+	data := make(map[string][]string)
 
-	completions["payees"] = []string{}
-	completions["tags"] = []string{}
-	completions["links"] = []string{}
+	data["payees"] = []string{}
+	data["tags"] = []string{}
+	data["links"] = []string{}
+	data["accounts"] = []string{}
+	data["currencies"] = []string{}
 
 	for _, path := range paths {
 		c, _ := ioutil.ReadFile(path)
@@ -627,68 +720,38 @@ func completionsHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("%v", err)
 		} else {
 			if len(txn.Payee) > 0 {
-				completions["payees"] = append(completions["payees"], txn.Payee)
+				data["payees"] = append(data["payees"], txn.Payee)
 			}
 			if len(txn.Link) > 0 {
-				completions["links"] = append(completions["links"], txn.Link)
+				data["links"] = append(data["links"], txn.Link)
 			}
 			if len(txn.Tags) > 0 {
 				for _, t := range txn.Tags {
-					completions["tags"] = append(completions["tags"], t)
+					data["tags"] = append(data["tags"], t)
 				}
 			}
 		}
 	}
 
-	completions["payees"] = UniqStr(completions["payees"])
-	completions["tags"] = UniqStr(completions["tags"])
-	completions["links"] = UniqStr(completions["links"])
+	data["payees"] = UniqStr(data["payees"])
+	data["tags"] = UniqStr(data["tags"])
+	data["links"] = UniqStr(data["links"])
 
-	w.Header().Set("Content-type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.Encode(completions)
-}
-
-func accountsHandler(w http.ResponseWriter, r *http.Request) {
-	c, err := ioutil.ReadFile(config.MainBeancountFile)
+	accounts, err := config.getAccounts()
 	if err != nil {
 		sendError(w, err)
 		return
 	}
 
-	data := []string{}
-	var matches [][]string
+	data["accounts"] = accounts
 
-	re := regexp.MustCompile(`\n[^ ]+ +open +([^ \n]+)`)
-
-	matches = re.FindAllStringSubmatch(string(c), -1)
-
-	for _, m := range matches {
-		data = append(data, m[1])
-	}
-
-	w.Header().Set("Content-type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.Encode(data)
-}
-
-func currenciesHandler(w http.ResponseWriter, r *http.Request) {
-	c, err := ioutil.ReadFile(config.MainBeancountFile)
+	currencies, err := config.getCurrencies()
 	if err != nil {
 		sendError(w, err)
 		return
 	}
 
-	data := []string{}
-	var matches [][]string
-
-	re := regexp.MustCompile(`\noption "operating_currency" +"([^ \n]+)"`)
-
-	matches = re.FindAllStringSubmatch(string(c), -1)
-
-	for _, m := range matches {
-		data = append(data, m[1])
-	}
+	data["currencies"] = currencies
 
 	w.Header().Set("Content-type", "application/json")
 	enc := json.NewEncoder(w)
@@ -750,7 +813,7 @@ func (c conf) updateMainBeancountFile() error {
 	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
 	paths, _ := filepath.Glob(globpath)
 
-	var txnsTexts []string
+	var billTexts []string
 	var content []byte
 	var text string
 
@@ -759,9 +822,9 @@ func (c conf) updateMainBeancountFile() error {
 			content, _ = ioutil.ReadFile(path)
 			text = string(content) + "\n"
 		} else {
-			text = fmt.Sprintf(`include "%s"`, path)
+			text = fmt.Sprintf(`include %q`, path)
 		}
-		txnsTexts = append(txnsTexts, text)
+		billTexts = append(billTexts, text)
 	}
 
 	content, err = ioutil.ReadFile(config.MainBeancountFile)
@@ -770,16 +833,16 @@ func (c conf) updateMainBeancountFile() error {
 	}
 	text = string(content)
 
-	// TODO user config.BillsFolder
-	pre := `;; === Transactions from ./bills ===`
-	post := `;; === Transactions end ===`
+	// TODO use config.BillsFolder for ./bills
+	pre := `;; === Beancounts from ./bills ===`
+	post := `;; === Beancounts end ===`
 
 	// TODO review regexp
 	re := regexp.MustCompile(pre + `[^=]*` + post)
 	parts := re.Split(text, 2)
 
 	if len(parts) != 2 {
-		return errors.New("couldn't find where to insert Transactions")
+		return errors.New("couldn't find where to insert Beancounts")
 	}
 
 	f, err := os.OpenFile(config.MainBeancountFile, os.O_WRONLY, 0644)
@@ -788,7 +851,7 @@ func (c conf) updateMainBeancountFile() error {
 	}
 	defer f.Close()
 
-	out := fmt.Sprintf("%s%s\n\n%s\n\n%s%s", parts[0], pre, s.Join(txnsTexts, "\n"), post, parts[1])
+	out := fmt.Sprintf("%s%s\n\n%s\n\n%s%s", parts[0], pre, s.Join(billTexts, "\n"), post, parts[1])
 	f.Write([]byte(out))
 
 	return nil
@@ -804,8 +867,6 @@ func (c conf) startWebApp() {
 	router.HandleFunc("/upload", uploadHandler).Methods("POST")
 
 	router.HandleFunc("/completions.json", completionsHandler).Methods("GET")
-	router.HandleFunc("/accounts.json", accountsHandler).Methods("GET")
-	router.HandleFunc("/currencies.json", currenciesHandler).Methods("GET")
 
 	n := MyClassic()
 	n.UseHandler(router)
