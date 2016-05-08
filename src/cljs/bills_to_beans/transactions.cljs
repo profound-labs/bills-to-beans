@@ -17,8 +17,8 @@
            :narration nil
            :tags []
            :link nil
-           :postings [{:account "Assets:PT:Bank:Current" :amount "-0.00" :currency "EUR"}
-                      {:account "Expenses:General" :amount "0.00" :currency "EUR"}]
+           :postings [{:account "" :amount "-0.00" :currency ""}
+                      {:account "" :amount "0.00" :currency ""}]
            :documents [{:filename nil :size nil}]}))
 
 (defn first-assets-account [accounts]
@@ -107,7 +107,6 @@
     (:transactions @data))
    ))
 
-
 (defn <new-transaction-form> [data ui-state completions]
   (fn []
     [:div
@@ -125,5 +124,6 @@
       (map-indexed (fn [idx _]
                      ^{:key (str "posting" idx)}
                      [<posting> idx data ui-state completions])
-                   (:postings @data))]]))
+                   (:postings @data))]
+     ]))
 

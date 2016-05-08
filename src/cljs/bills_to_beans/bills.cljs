@@ -16,7 +16,9 @@
 
 (declare <payees-list> <notes>)
 
-(defonce bill-data (r/atom {:transactions [{:data @default-transaction :ui {}}]
+(defonce bill-data (r/atom {:transactions [{:data @default-transaction :ui {}}
+                                           {:data @default-transaction :ui {}}
+                                           ]
                             :balances []
                             :notes []
                             :documents []
@@ -77,7 +79,14 @@
 
                                        (flash! response notice))
                                      (flash! response)
-                                     ))))))]
+                                     ))))))
+
+        add-default-transaction! (fn [_] (swap! bill-data update :transactions
+                                                (fn [a] (conj a {:data @default-transaction :ui {}}))))
+
+        remove-transaction! (fn [idx] (do (swap! bill-data assoc-in [:transactions idx] nil)
+                                          (swap! bill-data update :transactions #(into [] (remove nil? %)))))
+        ]
 
     (r/create-class {:component-will-mount
                      (fn []
@@ -111,13 +120,24 @@
                            (map-indexed
                             (fn [idx _]
                               ^{:key (str "txn" idx)}
-                              [:div.row
-                               [:div.col-sm-12
-                                [<new-transaction-form>
-                                 (r/cursor bill-data [:transactions idx :data])
-                                 (r/cursor bill-data [:transactions idx :ui])
-                                 completions]]])
+                              [:div [:div.row [:h4 "Transaction"]]
+                               [:div.row
+                                [:div.col-sm-12
+                                 [<new-transaction-form>
+                                  (r/cursor bill-data [:transactions idx :data])
+                                  (r/cursor bill-data [:transactions idx :ui])
+                                  completions]]]
+                               [:div.row
+                                [:div.col-sm-12 {:style {:textAlign "right"}}
+                                 [:button.btn.btn-default {:on-click (fn [_] (remove-transaction! idx))}
+                                  [:i.fa.fa-remove]]]]
+                               ])
                             (:transactions @bill-data)))
+
+                          [:div.row
+                           [:div.col-sm-12
+                            [:button.btn.btn-default {:on-click add-default-transaction!}
+                             [:i.fa.fa-plus] " Transaction"]]]
 
                           [:div.row {:style {:marginTop "2em"}}
                            [:div.col-sm-12
