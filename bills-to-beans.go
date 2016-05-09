@@ -72,15 +72,16 @@ func (c *conf) readConf() *conf {
 var config conf
 
 type Document struct {
-	Date    time.Time `json:"date"`
-	Account string    `json:"account"`
-	Path    string    `json:"path"`
+	Date     time.Time `json:"date"`
+	Account  string    `json:"account"`
+	Filename string    `json:"filename"`
+	DirPath  string
 }
 
 type auxiliary_document struct {
-	Date    string `json:"date"`
-	Account string `json:"account"`
-	Path    string `json:"path"`
+	Date     string `json:"date"`
+	Account  string `json:"account"`
+	Filename string `json:"filename"`
 }
 
 type Note struct {
@@ -110,19 +111,14 @@ type auxiliary_posting struct {
 	Currency string `json:"currency"`
 }
 
-type TxnDocument struct {
-	Filename string `json:"filename"`
-}
-
 type Transaction struct {
-	Date      time.Time     `json:"date"`
-	Flag      string        `json:"flag"`
-	Payee     string        `json:"payee"`
-	Narration string        `json:"narration"`
-	Tags      []string      `json:"tags"`
-	Link      string        `json:"link"`
-	Postings  []Posting     `json:"postings"`
-	Documents []TxnDocument `json:"documents"`
+	Date      time.Time `json:"date"`
+	Flag      string    `json:"flag"`
+	Payee     string    `json:"payee"`
+	Narration string    `json:"narration"`
+	Tags      []string  `json:"tags"`
+	Link      string    `json:"link"`
+	Postings  []Posting `json:"postings"`
 }
 
 type auxiliary_transaction struct {
@@ -133,7 +129,6 @@ type auxiliary_transaction struct {
 	Tags      []string            `json:"tags"`
 	Link      string              `json:"link"`
 	Postings  []auxiliary_posting `json:"postings"`
-	Documents []TxnDocument       `json:"documents"`
 }
 
 type Balance struct {
@@ -218,12 +213,12 @@ func (d Document) String() string {
 		"%s document %s %q",
 		d.Date.Format("2006-01-02"),
 		d.Account,
-		d.Path,
+		filepath.Join(d.DirPath, d.Filename),
 	)
 }
 
 // http://stackoverflow.com/a/21061062/195141
-func (d TxnDocument) Copy(dst string) error {
+func (d Document) Copy(dst string) error {
 	in, err := os.Open(filepath.Join(appTempDir, d.Filename))
 	if err != nil {
 		return err
@@ -376,6 +371,14 @@ func (t Transaction) sumAmountFmt() string {
 	return ""
 }
 
+func (bal Balance) sanitizedBase() string {
+	parts := []string{
+		bal.Date.Format("2006-01-02"),
+		"balance",
+	}
+	return sanitizeFilename(s.Join(parts, " _ "))
+}
+
 func (t Transaction) sanitizedBase() string {
 	var parts []string
 	if len(t.Payee) > 0 {
@@ -412,6 +415,7 @@ func (b Bill) String() string {
 	//}
 
 	for _, doc := range b.Documents {
+		doc.DirPath = b.DirPath
 		strs = append(strs, doc.String())
 	}
 
@@ -422,7 +426,7 @@ func (b Bill) String() string {
 func (b *Bill) EnsureDirPath() error {
 	var err error
 
-	// Use the first Transaction
+	// Use the first Transaction or Balance
 
 	if len(b.Transactions) > 0 {
 		t := b.Transactions[0]
@@ -432,16 +436,24 @@ func (b *Bill) EnsureDirPath() error {
 			fmt.Sprintf("%02d", t.Date.Month()),
 			t.sanitizedBase(),
 		)
-
-		if ex, _ := exists(b.DirPath); ex {
-			return errors.New(fmt.Sprintf("Already exists: %s", b.DirPath))
-		}
-
-		if err = os.MkdirAll(b.DirPath, 0755); err != nil {
-			return err
-		}
+	} else if len(b.Balances) > 0 {
+		bal := b.Balances[0]
+		b.DirPath = filepath.Join(
+			config.BillsFolder,
+			fmt.Sprintf("%04d", bal.Date.Year()),
+			fmt.Sprintf("%02d", bal.Date.Month()),
+			bal.sanitizedBase(),
+		)
 	} else {
-		return errors.New(fmt.Sprintf("Need at least one transaction"))
+		return errors.New(fmt.Sprintf("Need at least one transaction or balance"))
+	}
+
+	if ex, _ := exists(b.DirPath); ex {
+		return errors.New(fmt.Sprintf("Already exists: %s", b.DirPath))
+	}
+
+	if err = os.MkdirAll(b.DirPath, 0755); err != nil {
+		return err
 	}
 
 	return nil
@@ -505,21 +517,27 @@ func (t *Transaction) ParseBeancount(text string) error {
 	return nil
 }
 
-// TODO
-//func (t *Transaction) SaveTxnDocuments() error {
-//	var err error
-//
-//	for _, doc := range t.Documents {
-//		// TODO check if filename already exists
-//		newpath := filepath.Join(t.DirPath, doc.Filename)
-//		err = doc.Copy(newpath)
-//		if err != nil {
-//			return err
-//		}
-//	}
-//
-//	return nil
-//}
+func (b *Bill) SaveDocuments() (err error) {
+	for _, doc := range b.Documents {
+		if len(doc.Filename) == 0 {
+			continue
+		}
+		newpath := filepath.Join(b.DirPath, doc.Filename)
+		ex, err := exists(newpath)
+		if ex {
+			return errors.New(fmt.Sprintf("File already exists: %s", newpath))
+		}
+		if err != nil {
+			return err
+		}
+		err = doc.Copy(newpath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 func (b *Bill) Save(c conf) error {
 	var err error
@@ -532,12 +550,9 @@ func (b *Bill) Save(c conf) error {
 		return err
 	}
 
-	// TODO
-	//for _, t := range b.Transactions {
-	//	if err = t.SaveTxnDocuments(); err != nil {
-	//		return err
-	//	}
-	//}
+	if err = b.SaveDocuments(); err != nil {
+		return err
+	}
 
 	if err = c.updateMainBeancountFile(); err != nil {
 		return err
@@ -546,23 +561,53 @@ func (b *Bill) Save(c conf) error {
 	return nil
 }
 
+func (aux_bal auxiliary_balance) ToBalance() Balance {
+	var date time.Time
+	if len(aux_bal.Date) >= 10 {
+		date, _ = time.Parse("2006-01-02", aux_bal.Date[0:10])
+	} else {
+		date = time.Now()
+	}
+
+	amount, _ := strconv.ParseFloat(aux_bal.Amount, 64)
+
+	bal := Balance{
+		Date:          date,
+		Amount:        amount,
+		Currency:      aux_bal.Currency,
+		SourceAccount: aux_bal.SourceAccount,
+		//TargetAccount:  aux_bal.TargetAccount,
+		//Padded: aux_bal.Padded,
+	}
+
+	return bal
+}
+
+func (aux_doc auxiliary_document) ToDocument() Document {
+	var date time.Time
+	if len(aux_doc.Date) >= 10 {
+		date, _ = time.Parse("2006-01-02", aux_doc.Date[0:10])
+	} else {
+		date = time.Now()
+	}
+
+	doc := Document{
+		Date:     date,
+		Account:  aux_doc.Account,
+		Filename: aux_doc.Filename,
+	}
+
+	return doc
+}
+
 func (aux_txn auxiliary_transaction) ToTransaction() Transaction {
 	date, _ := time.Parse("2006-01-02", aux_txn.Date[0:10])
-
-	// Filter out empty docs
-	documents := []TxnDocument{}
-	for _, doc := range aux_txn.Documents {
-		if len(doc.Filename) > 0 {
-			documents = append(documents, doc)
-		}
-	}
 
 	txn := Transaction{
 		Date:      date,
 		Flag:      aux_txn.Flag,
 		Payee:     s.Replace(aux_txn.Payee, `"`, `'`, -1),
 		Narration: s.Replace(aux_txn.Narration, `"`, `'`, -1),
-		Documents: documents,
 	}
 
 	for _, p := range aux_txn.Postings {
@@ -638,12 +683,31 @@ func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 
 	var bill Bill
 
+	// Documents
+
+	for _, aux_doc := range aux_bill.Documents {
+		doc := aux_doc.ToDocument()
+		bill.Documents = append(bill.Documents, doc)
+	}
+
+	// Transactions
+
 	for _, aux_txn := range aux_bill.Transactions {
 		txn := aux_txn.ToTransaction()
 		bill.Transactions = append(bill.Transactions, txn)
 	}
 
+	// Balances
+
+	for _, aux_bal := range aux_bill.Balances {
+		bal := aux_bal.ToBalance()
+		bill.Balances = append(bill.Balances, bal)
+	}
+
 	if err := bill.Save(config); err != nil {
+		if ex, _ := exists(bill.DirPath); ex {
+			os.RemoveAll(bill.DirPath)
+		}
 		sendError(w, err)
 		return
 	}
@@ -816,7 +880,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Simulate waiting time for upload during development
 	if developmentMode {
-		time.Sleep(time.Duration(3) * time.Second)
+		time.Sleep(time.Duration(2) * time.Second)
 	}
 
 	w.Header().Set("Content-type", "application/json")

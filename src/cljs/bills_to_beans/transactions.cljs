@@ -6,6 +6,8 @@
             [secretary.core :as secretary :include-macros true]
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
+            [bills-to-beans.helpers
+             :refer [not-zero? first-assets-account first-expenses-account]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
@@ -18,32 +20,15 @@
            :tags []
            :link nil
            :postings [{:account "" :amount "-0.00" :currency ""}
-                      {:account "" :amount "0.00" :currency ""}]
-           :documents [{:filename nil :size nil}]}))
-
-(defn first-assets-account [accounts]
-  "Assets:PT:Bank:Current")
-
-(defn first-expenses-account [accounts]
-  "Expenses:General")
+                      {:account "" :amount "0.00" :currency ""}]}))
 
 (defn set-accounts [data accounts]
-  (swap! data update-in
-         [:postings 0 :account] #(first-assets-account accounts))
-  (swap! data update-in
-         [:postings 1 :account] #(first-expenses-account accounts)))
+  (do (swap! data assoc-in [:postings 0 :account] (first-assets-account accounts))
+      (swap! data assoc-in [:postings 1 :account] (first-expenses-account accounts))))
 
 (defn set-currencies [data currencies]
-  (swap! data update-in
-         [:postings 0 :currency] #(first currencies))
-  (swap! data update-in
-         [:postings 1 :currency] #(first currencies)))
-
-(defn not-zero? [korks error-message]
-  (fn [cursor]
-    (let [n (get-in cursor korks)]
-      (when (or (nil? n) (= n 0) (= (js/parseFloat n) 0.00))
-       (v/validation-error [korks] error-message)))))
+  (do (swap! data assoc-in [:postings 0 :currency] (first currencies))
+      (swap! data assoc-in [:postings 1 :currency] (first currencies))))
 
 (defn balance-two-postings! [data changed-idx]
   (when (= 2 (count (:postings @data)))
@@ -97,15 +82,17 @@
                (not-zero? [:postings 1 :amount] "Must have")))
 
 (defn validate-all-transactions! [data]
-  (reduce
-   (fn [a b] (and a b))
-   (map-indexed
-    (fn [idx _]
-      (let [d (r/cursor data [:transactions idx :data])
-            u (r/cursor data [:transactions idx :ui])]
-        (validate-transaction! d u)))
-    (:transactions @data))
-   ))
+  (if (= 0 (count (:transactions @data)))
+    true
+    (reduce
+     (fn [a b] (and a b))
+     (map-indexed
+      (fn [idx _]
+        (let [d (r/cursor data [:transactions idx :data])
+              u (r/cursor data [:transactions idx :ui])]
+          (validate-transaction! d u)))
+      (:transactions @data))
+     )))
 
 (defn <new-transaction-form> [data ui-state completions]
   (fn []
