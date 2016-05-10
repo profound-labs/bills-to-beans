@@ -7,7 +7,7 @@
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
             [dommy.core :refer-macros [sel sel1]]
-            [bills-to-beans.helpers :refer [flash! fire!]]
+            [bills-to-beans.helpers :refer [flash! fire! filesize-str]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
@@ -75,7 +75,7 @@
                                      (let [document (:body response)]
                                        (reset! uploading? false)
                                        (update-document-data! data document file-id)
-                                       (parse-filename! data (:filename document)))
+                                       (parse-filename! (r/cursor data [:transactions 0 :data]) (:filename document)))
                                      (flash! response)
                                      )))))))
 
@@ -98,17 +98,16 @@
           ;; Upload button
           [:tr
            [:td
-            [:button.btn.btn-primary {:style {:padding "0px"}
-                                      :on-click (fn [e]
-                                                  (do (fire! (sel1 (str "#" field-name)) :click)
-                                                      (.stopPropagation e)))}
-             [:label.document-file-upload {:for field-name
-                                           :style {:margin "2px"}
-                                           :on-click (fn [e]
-                                                       (do (.preventDefault e)
-                                                           (fire! (sel1 (str "#" field-name)) :click)
-                                                           (.stopPropagation e)))}
-              [:i.fa.fa-2x.fa-fw.fa-file]]]
+            [:div.document-file-upload
+             [:button.btn.btn-primary {:on-click (fn [e]
+                                                   (do (fire! (sel1 (str "#" field-name)) :click)
+                                                       (.stopPropagation e)))}
+              [:label {:for field-name
+                       :on-click (fn [e]
+                                   (do (.preventDefault e)
+                                       (fire! (sel1 (str "#" field-name)) :click)
+                                       (.stopPropagation e)))}
+               [:i.fa.fa-2x.fa-fw.fa-file]]]]
             [:input.file-input
              {:type "file"
               :id field-name
@@ -121,9 +120,11 @@
          ;; File details
         [:tr
          [:td [:span @filename]]
-         [:td [:span (format "(%.1f kb)", (/ @size 1024))]]
-         [:td [:button.btn.btn-default {:on-click (fn [_] (remove-document! file-id))}
-               [:i.fa.fa-remove]]]]
+         [:td {:style {:textAlign "right"}}
+          [:span (filesize-str @size)]]
+         [:td {:style {:textAlign "right"}}
+          [:button.btn.btn-danger {:on-click (fn [_] (remove-document! file-id))}
+           [:i.fa.fa-remove]]]]
          )
       )))
 

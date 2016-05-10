@@ -7,8 +7,8 @@
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
             [bills-to-beans.helpers
-             :refer [flash! get-resource!
-                     first-assets-account first-expenses-account]]
+             :refer [flash! get-resource! first-assets-account
+                     first-expenses-account filesize-str]]
             [bills-to-beans.payees :refer [<payees-list>]]
             [bills-to-beans.documents :refer [<document-upload>]]
             [bills-to-beans.transactions
@@ -68,7 +68,7 @@
         ^{:key (str "files" idx)}
         [:tr
          [:td (a 0)]
-         [:td (a 1)]])
+         [:td (filesize-str (a 1))]])
       (map vector
            (map (fn [a] (-> a
                             (string/replace dir_path "")
@@ -164,7 +164,7 @@
                          [:div.col-sm-10
 
                           [:div.row
-                           [:h1.col-sm-12 "New Bill"]]
+                           [:h1 "New Bill"]]
 
                           [:div
                            [:div.row [:h4 "Documents"]]
@@ -185,7 +185,7 @@
                                   completions]]]
                                [:div.row
                                 [:div.col-sm-12 {:style {:textAlign "right"}}
-                                 [:button.btn.btn-default {:on-click (fn [_] (remove-transaction! idx))}
+                                 [:button.btn.btn-danger {:on-click (fn [_] (remove-transaction! idx))}
                                   [:i.fa.fa-remove]]]]
                                ])
                             (:transactions @bill-data)))
@@ -208,7 +208,7 @@
                                   completions]]]
                                [:div.row
                                 [:div.col-sm-12 {:style {:textAlign "right"}}
-                                 [:button.btn.btn-default {:on-click (fn [_] (remove-balance! idx))}
+                                 [:button.btn.btn-danger {:on-click (fn [_] (remove-balance! idx))}
                                   [:i.fa.fa-remove]]]]
                                ])
                             (:balances @bill-data)))
@@ -231,7 +231,7 @@
                                   completions]]]
                                [:div.row
                                 [:div.col-sm-12 {:style {:textAlign "right"}}
-                                 [:button.btn.btn-default {:on-click (fn [_] (remove-note! idx))}
+                                 [:button.btn.btn-danger {:on-click (fn [_] (remove-note! idx))}
                                   [:i.fa.fa-remove]]]]
                                ])
                             (:notes @bill-data)))
@@ -241,11 +241,10 @@
                             [:button.btn.btn-default {:on-click add-default-note!}
                              [:i.fa.fa-plus] " Note"]]]
 
-                          [:div.row {:style {:marginTop "2em"}}
-                           [:div.col-sm-12
-                            [:button.btn.btn-primary {:on-click save-bill!}
-                             [:i.fa.fa-hand-o-right]
-                             [:span " SAVE"]]]]
+                          [:div.row {:style {:marginTop "3em"}}
+                           [:button.btn.btn-primary {:on-click save-bill!}
+                            [:i.fa.fa-hand-o-right]
+                            [:span " Save Bill"]]]
 
                           [:div.row
                            [:div.col-sm-3.pull-right

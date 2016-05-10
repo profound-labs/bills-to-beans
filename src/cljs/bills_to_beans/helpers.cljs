@@ -2,6 +2,7 @@
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [reagent.core :as r]
             [reagent.session :as session]
+            [reagent.format :refer [format]]
             [secretary.core :include-macros true :as secretary]
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
@@ -38,6 +39,11 @@
     (let [n (get-in cursor korks)]
       (when (or (nil? n) (= n 0) (= (js/parseFloat n) 0.00))
         (v/validation-error [korks] error-message)))))
+
+(defn filesize-str [bytes]
+  (if (< bytes (* 1024 1024))
+    (format "%.1f kB", (/ bytes 1024))
+    (format "%.1f MB", (/ bytes (* 1024 1024)))))
 
 ;; dommy/test/dommy/test_utils.cljs
 (defn fire!
