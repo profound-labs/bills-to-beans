@@ -82,8 +82,8 @@ func TestDocumentString(t *testing.T) {
 		Document{
 			Date:    isodate("2015-08-11"),
 			Account: "Assets:Bank:Checking",
-			Path:    "./scans.pdf",
-		}: `2015-08-11 document Assets:Bank:Checking "./scans.pdf"`,
+			Path:    `./today's "best" scans.pdf`,
+		}: `2015-08-11 document Assets:Bank:Checking "./today's \"best\" scans.pdf"`,
 	}
 
 	for doc, expect := range documents {

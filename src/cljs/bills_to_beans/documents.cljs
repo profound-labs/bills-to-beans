@@ -6,7 +6,8 @@
             [secretary.core :as secretary :include-macros true]
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
-            [bills-to-beans.helpers :refer [flash!]]
+            [dommy.core :refer-macros [sel sel1]]
+            [bills-to-beans.helpers :refer [flash! fire! filesize-str]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
@@ -55,22 +56,32 @@
 (defn <document-input> [data file-id]
   (let [field-name (str "document_file" file-id)
         uploading? (r/atom false)
+        have-already? (fn [file] (> (count (remove
+                                            #(not (= (.-name file) (:filename %)))
+                                            (:documents @data)))
+                                    0))
         upload-file! (fn [e]
                        (let [file (first (array-seq (-> e .-target .-files)))]
-                         (do
-                           (reset! uploading? true)
-                           (more-documents! data)
-                           (go (let [response (<! (http/post
-                                                  "/upload"
-                                                  {:multipart-params [["file" file]]}))]
+                         (if (have-already? file)
+                           (flash! {:body {:flash (format "Already uploaded: %s" (.-name file))}})
+                           (do
+                             (reset! uploading? true)
+                             (more-documents! data)
+                             (go (let [response (<! (http/post
+                                                     "/upload"
+                                                     {:multipart-params [["file" file]]}))]
 
-                                (if (:success response)
-                                  (let [document (:body response)]
-                                    (reset! uploading? false)
-                                    (update-document-data! data document file-id)
-                                    (parse-filename! data (:filename document)))
-                                  (flash! response)
-                                  ))))))
+                                   (if (:success response)
+                                     (let [document (:body response)]
+                                       (reset! uploading? false)
+                                       (update-document-data! data document file-id)
+                                       (parse-filename! (r/cursor data [:transactions 0 :data]) (:filename document)))
+                                     (flash! response)
+                                     )))))))
+
+        remove-document! (fn [file-id] (do (swap! data assoc-in [:documents file-id] nil)
+                                           (swap! data update :documents #(into [] (remove nil? %)))))
+
         filename (r/cursor data [:documents file-id :filename])
         size (r/cursor data [:documents file-id :size])]
 
@@ -81,28 +92,39 @@
           [:tr
            [:td [:span
                  [:i.fa.fa-fw.fa-spin.fa-circle-o-notch]]]
+           [:td]
            [:td]]
 
           ;; Upload button
           [:tr
            [:td
-            [:button.btn.btn-primary {:style {:padding "0px"}
-                                      ;; TODO click label
-                                      :on-click (fn [e] (prn "click label"))}
-             [:label.document-file-upload {:for field-name :style {:margin "2px"}}
-              [:i.fa.fa-2x.fa-fw.fa-file]]]
+            [:div.document-file-upload
+             [:button.btn.btn-primary {:on-click (fn [e]
+                                                   (do (fire! (sel1 (str "#" field-name)) :click)
+                                                       (.stopPropagation e)))}
+              [:label {:for field-name
+                       :on-click (fn [e]
+                                   (do (.preventDefault e)
+                                       (fire! (sel1 (str "#" field-name)) :click)
+                                       (.stopPropagation e)))}
+               [:i.fa.fa-2x.fa-fw.fa-file]]]]
             [:input.file-input
              {:type "file"
               :id field-name
               :accept "image/*;capture=camera"
               :on-change upload-file!
               }]]
+           [:td]
            [:td]])
 
          ;; File details
         [:tr
          [:td [:span @filename]]
-         [:td [:span (format "(%.1f kb)", (/ @size 1024))]]]
+         [:td {:style {:textAlign "right"}}
+          [:span (filesize-str @size)]]
+         [:td {:style {:textAlign "right"}}
+          [:button.btn.btn-danger {:on-click (fn [_] (remove-document! file-id))}
+           [:i.fa.fa-remove]]]]
          )
       )))
 

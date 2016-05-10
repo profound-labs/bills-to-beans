@@ -1,7 +1,7 @@
 (ns bills-to-beans.core
     (:require [reagent.core :as r :refer [atom]]
               [reagent.session :as session]
-              [bills-to-beans.transaction :refer [<new-transaction-page>]]
+              [bills-to-beans.bills :refer [<new-bill-page>]]
               [secretary.core :as secretary :include-macros true]
               [clojure.string :as string]))
 
@@ -10,7 +10,8 @@
 
 (defn <flash-message> []
   (let [class (if-let [class (:class (session/get :flash))] class "alert-info" )
-        message (:msg (session/get :flash))]
+        message (:msg (session/get :flash))
+        notice (:notice (session/get :flash))]
 
     (when (not (string/blank? message))
       [:div.alert.alert-dismissable
@@ -19,6 +20,8 @@
         [:span {:aria-hidden "true"} "×"]];; &times;
        (when (not (string/blank? message))
          [:span message])
+       (when notice
+         notice)
        ])
     ))
 
@@ -28,28 +31,14 @@
     [<flash-message>]]])
 
 (defn <home-page> []
-  [<new-transaction-page>])
-
-(defn <notes> []
-  [:div.container
-   [:div.row
-    [:div.col-sm-3.pull-right
-     [:p "Usually:"]
-     [:table.table
-      [:tbody
-       [:tr [:td "- Assets"] [:td "→"] [:td "+ Expenses"]]
-       [:tr [:td "- Income"] [:td "→"] [:td "+ Assets"]]
-       ]]
-     ]]])
+  [<new-bill-page>])
 
 ;; -------------------------
 ;; Initialize app
 
 (defn mount-root []
   (r/render [<flash>] (.getElementById js/document "flash"))
-  (r/render [<home-page>] (.getElementById js/document "app"))
-  (r/render [<notes>] (.getElementById js/document "notes"))
-  )
+  (r/render [<home-page>] (.getElementById js/document "app")))
 
 (defn init! []
   (mount-root))

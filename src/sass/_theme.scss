@@ -4,12 +4,48 @@ body {
 }
 
 #flash_wrap {
-    position: absolute;
-    top: 0px;
-    left: 0px;
+    position: fixed;
+    top: 10px;
+    left: 10px;
     padding: 1em;
     margin: 0px auto;
     z-index: 999;
+}
+
+h4 {
+    text-transform: uppercase;
+    font-size: 0.8em;
+    letter-spacing: 0.8pt;
+}
+
+.btn-primary {
+    text-transform: uppercase;
+    letter-spacing: 0.8pt;
+}
+
+.row {
+    margin-bottom: 0.5em;
+}
+
+.btn-default,
+.btn-danger {
+    border-radius: 20px 0; 
+    padding: 8px 10px;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.8pt;
+}
+
+button.list-group-item {
+    padding-top: 0.25em;
+    padding-bottom: 0.25em;
+    border-radius: 20px 0; 
+    margin-top: 2px;
+    margin-bottom: 2px;
+
+    &:first-child, &:last-child {
+        border-radius: 20px 0; 
+    }
 }
 
 .table {
@@ -51,11 +87,20 @@ input, select {
 input[type="file"].file-input {
     display: none;
 }
-.document-file-upload {
+
+.document-file-upload button {
+    padding: 0px;
+}
+
+.document-file-upload label {
     border-color: transparent;
     color: #fff;
-    background-color: #DF691A;
+    background-color: $label-primary-bg;
     display: inline-block;
     padding: 6px 12px;
+    margin: 0px;
     cursor: pointer;
+    &:hover {
+        background-color: #b15315;
+    }
 }

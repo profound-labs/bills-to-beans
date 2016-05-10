@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/codegangsta/cli"
 	"github.com/codegangsta/negroni"
-	//"github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/getwe/figlet4go"
 	"github.com/gorilla/mux"
 	"github.com/skratchdot/open-golang/open"
@@ -36,18 +36,20 @@ var useLocal bool
 var appTempDir string
 
 type conf struct {
-	BillsFolder       string `yaml:"bills_folder"`
-	MainBeancountFile string `yaml:"main_beancount_file"`
-	ServerPort        int    `yaml:"server_port"`
-	InlineBeancounts  bool   `yaml:inline_beancounts`
+	BillsFolder           string `yaml:"bills_folder"`
+	MainBeancountFile     string `yaml:"main_beancount_file"`
+	IncludesBeancountFile string `yaml:"includes_beancount_file"`
+	ServerPort            int    `yaml:"server_port"`
+	InlineBeancounts      bool   `yaml:inline_beancounts`
 }
 
 func (c *conf) readConf() *conf {
 	theconf := conf{
-		BillsFolder:       "./bills",
-		MainBeancountFile: "./bills.beancount",
-		ServerPort:        3030,
-		InlineBeancounts:  false,
+		BillsFolder:           "./bills",
+		MainBeancountFile:     "./bills.beancount",
+		IncludesBeancountFile: "./includes.beancount",
+		ServerPort:            3030,
+		InlineBeancounts:      false,
 	}
 
 	yamlFile, err := ioutil.ReadFile("config.yml")
@@ -72,9 +74,28 @@ func (c *conf) readConf() *conf {
 var config conf
 
 type Document struct {
-	Date    time.Time `json:"date"`
-	Account string    `json:"account"`
-	Path    string    `json:"path"`
+	Date     time.Time `json:"date"`
+	Account  string    `json:"account"`
+	Filename string    `json:"filename"`
+	DirPath  string
+}
+
+type auxiliary_document struct {
+	Date     string `json:"date"`
+	Account  string `json:"account"`
+	Filename string `json:"filename"`
+}
+
+type Note struct {
+	Date        time.Time `json:"date"`
+	Account     string    `json:"account"`
+	Description string    `json:"description"`
+}
+
+type auxiliary_note struct {
+	Date        string `json:"date"`
+	Account     string `json:"account"`
+	Description string `json:"description"`
 }
 
 type Posting struct {
@@ -85,20 +106,31 @@ type Posting struct {
 	padlength int
 }
 
-type TxnDocument struct {
-	Filename string `json:"filename"`
+type auxiliary_posting struct {
+	Flag     string `json:"flag"`
+	Account  string `json:"account"`
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
 }
 
 type Transaction struct {
-	Date      time.Time     `json:"date"`
-	Flag      string        `json:"flag"`
-	Payee     string        `json:"payee"`
-	Narration string        `json:"narration"`
-	Tags      []string      `json:"tags"`
-	Link      string        `json:"link"`
-	Postings  []Posting     `json:"postings"`
-	Documents []TxnDocument `json:"documents"`
-	DirPath   string
+	Date      time.Time `json:"date"`
+	Flag      string    `json:"flag"`
+	Payee     string    `json:"payee"`
+	Narration string    `json:"narration"`
+	Tags      []string  `json:"tags"`
+	Link      string    `json:"link"`
+	Postings  []Posting `json:"postings"`
+}
+
+type auxiliary_transaction struct {
+	Date      string              `json:"date"`
+	Flag      string              `json:"flag"`
+	Payee     string              `json:"payee"`
+	Narration string              `json:"narration"`
+	Tags      []string            `json:"tags"`
+	Link      string              `json:"link"`
+	Postings  []auxiliary_posting `json:"postings"`
 }
 
 type Balance struct {
@@ -108,6 +140,30 @@ type Balance struct {
 	SourceAccount string    `json:"source_account"`
 	TargetAccount string    `json:"target_account"`
 	Padded        bool      `json:"padded"`
+}
+
+type auxiliary_balance struct {
+	Date          string `json:"date"`
+	Amount        string `json:"amount"`
+	Currency      string `json:"currency"`
+	SourceAccount string `json:"source_account"`
+	TargetAccount string `json:"target_account"`
+	Padded        bool   `json:"padded"`
+}
+
+type Bill struct {
+	Transactions []Transaction `json:"transactions"`
+	Balances     []Balance     `json:"balances"`
+	Documents    []Document    `json:"documents"`
+	Notes        []Note        `json:"notes"`
+	DirPath      string
+}
+
+type auxiliary_bill struct {
+	Transactions []auxiliary_transaction `json:"transactions"`
+	Balances     []auxiliary_balance     `json:"balances"`
+	Documents    []auxiliary_document    `json:"documents"`
+	Notes        []auxiliary_note        `json:"notes"`
 }
 
 func sanitizeFilename(text string) string {
@@ -154,17 +210,26 @@ func figletString(text string) string {
 	return renderStr
 }
 
+func (n Note) String() string {
+	return fmt.Sprintf(
+		"%s note %s %q",
+		n.Date.Format("2006-01-02"),
+		n.Account,
+		n.Description,
+	)
+}
+
 func (d Document) String() string {
 	return fmt.Sprintf(
-		"%s document %s %s",
+		"%s document %s %q",
 		d.Date.Format("2006-01-02"),
 		d.Account,
-		`"`+d.Path+`"`,
+		filepath.Join(d.DirPath, d.Filename),
 	)
 }
 
 // http://stackoverflow.com/a/21061062/195141
-func (d TxnDocument) Copy(dst string) error {
+func (d Document) Copy(dst string) error {
 	in, err := os.Open(filepath.Join(appTempDir, d.Filename))
 	if err != nil {
 		return err
@@ -317,6 +382,22 @@ func (t Transaction) sumAmountFmt() string {
 	return ""
 }
 
+func (note Note) sanitizedBase() string {
+	parts := []string{
+		note.Date.Format("2006-01-02"),
+		"note",
+	}
+	return sanitizeFilename(s.Join(parts, " _ "))
+}
+
+func (bal Balance) sanitizedBase() string {
+	parts := []string{
+		bal.Date.Format("2006-01-02"),
+		"balance",
+	}
+	return sanitizeFilename(s.Join(parts, " _ "))
+}
+
 func (t Transaction) sanitizedBase() string {
 	var parts []string
 	if len(t.Payee) > 0 {
@@ -336,35 +417,82 @@ func (t Transaction) sanitizedBase() string {
 	return sanitizeFilename(s.Join(parts, " _ "))
 }
 
-func (t *Transaction) EnsureDirPath() error {
-	var err error
+func (b Bill) String() string {
+	var strs []string
 
-	t.DirPath = filepath.Join(
-		config.BillsFolder,
-		fmt.Sprintf("%04d", t.Date.Year()),
-		fmt.Sprintf("%02d", t.Date.Month()),
-		t.sanitizedBase(),
-	)
-
-	if ex, _ := exists(t.DirPath); ex {
-		return errors.New(fmt.Sprintf("Already exists: %s", t.DirPath))
+	for _, txn := range b.Transactions {
+		strs = append(strs, txn.String())
 	}
 
-	if err = os.MkdirAll(t.DirPath, 0755); err != nil {
+	for _, bal := range b.Balances {
+		strs = append(strs, bal.String())
+	}
+
+	for _, note := range b.Notes {
+		strs = append(strs, note.String())
+	}
+
+	for _, doc := range b.Documents {
+		doc.DirPath = b.DirPath
+		strs = append(strs, doc.String())
+	}
+
+	return s.Join(strs, "\n\n")
+}
+
+// Uses globals: config
+func (b *Bill) EnsureDirPath() error {
+	var err error
+
+	// Use the first Transaction or Balance
+
+	if len(b.Transactions) > 0 {
+		t := b.Transactions[0]
+		b.DirPath = filepath.Join(
+			config.BillsFolder,
+			fmt.Sprintf("%04d", t.Date.Year()),
+			fmt.Sprintf("%02d", t.Date.Month()),
+			t.sanitizedBase(),
+		)
+	} else if len(b.Balances) > 0 {
+		bal := b.Balances[0]
+		b.DirPath = filepath.Join(
+			config.BillsFolder,
+			fmt.Sprintf("%04d", bal.Date.Year()),
+			fmt.Sprintf("%02d", bal.Date.Month()),
+			bal.sanitizedBase(),
+		)
+	} else if len(b.Notes) > 0 {
+		note := b.Notes[0]
+		b.DirPath = filepath.Join(
+			config.BillsFolder,
+			fmt.Sprintf("%04d", note.Date.Year()),
+			fmt.Sprintf("%02d", note.Date.Month()),
+			note.sanitizedBase(),
+		)
+	} else {
+		return errors.New(fmt.Sprintf("Need at least one transaction, balance or note"))
+	}
+
+	if ex, _ := exists(b.DirPath); ex {
+		return errors.New(fmt.Sprintf("Already exists: %s", b.DirPath))
+	}
+
+	if err = os.MkdirAll(b.DirPath, 0755); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (t Transaction) BeancountFilename() string {
-	return "transaction.beancount"
+func (b Bill) BeancountFilename() string {
+	return "bill.beancount"
 }
 
-func (t *Transaction) SaveBeancount() error {
+func (b *Bill) SaveBeancount() error {
 	var err error
 
-	path := filepath.Join(t.DirPath, t.BeancountFilename())
+	path := filepath.Join(b.DirPath, b.BeancountFilename())
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
@@ -372,7 +500,7 @@ func (t *Transaction) SaveBeancount() error {
 	}
 	defer f.Close()
 
-	_, err = f.WriteString(t.String())
+	_, err = f.WriteString(b.String())
 	if err != nil {
 		return err
 	}
@@ -384,12 +512,13 @@ func (t *Transaction) ParseBeancount(text string) error {
 	text = s.TrimSpace(text)
 	firstLine := s.TrimSpace(s.Split(text, "\n")[0])
 
-	re := regexp.MustCompile(`^([^ ]+) ([\*\!]) *("[^"]+")? *("[^"]+")?`)
+	re := regexp.MustCompile(`^([^ ]+) ([\*\!]) *("[^"]+")?[ \|]*("[^"]+")?`)
 	matches := re.FindStringSubmatch(firstLine)
 
 	if len(matches) > 0 {
 		t.Date, _ = time.Parse("2006-01-02", matches[1])
 		t.Flag = matches[2]
+		// matches[0] is the complete matched string
 		if len(matches[4]) > 0 {
 			t.Payee = s.Trim(matches[3], `"`)
 			t.Narration = s.Trim(matches[4], `"`)
@@ -415,12 +544,19 @@ func (t *Transaction) ParseBeancount(text string) error {
 	return nil
 }
 
-func (t *Transaction) SaveTxnDocuments() error {
-	var err error
-
-	for _, doc := range t.Documents {
-		// TODO check if filename already exists
-		newpath := filepath.Join(t.DirPath, doc.Filename)
+func (b *Bill) SaveDocuments() (err error) {
+	for _, doc := range b.Documents {
+		if len(doc.Filename) == 0 {
+			continue
+		}
+		newpath := filepath.Join(b.DirPath, doc.Filename)
+		ex, err := exists(newpath)
+		if ex {
+			return errors.New(fmt.Sprintf("File already exists: %s", newpath))
+		}
+		if err != nil {
+			return err
+		}
 		err = doc.Copy(newpath)
 		if err != nil {
 			return err
@@ -430,26 +566,97 @@ func (t *Transaction) SaveTxnDocuments() error {
 	return nil
 }
 
-func (t *Transaction) Save(c conf) error {
+func (b *Bill) Save(c conf) error {
 	var err error
 
-	if err = t.EnsureDirPath(); err != nil {
+	if err = b.EnsureDirPath(); err != nil {
 		return err
 	}
 
-	if err = t.SaveBeancount(); err != nil {
+	if err = b.SaveBeancount(); err != nil {
 		return err
 	}
 
-	if err = t.SaveTxnDocuments(); err != nil {
+	if err = b.SaveDocuments(); err != nil {
 		return err
 	}
 
-	if err = c.updateMainBeancountFile(); err != nil {
+	if err = c.updateIncludesBeancountFile(); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (aux_bal auxiliary_balance) ToBalance() Balance {
+	var date time.Time
+	if len(aux_bal.Date) >= 10 {
+		date, _ = time.Parse("2006-01-02", aux_bal.Date[0:10])
+	} else {
+		date = time.Now()
+	}
+
+	amount, _ := strconv.ParseFloat(aux_bal.Amount, 64)
+
+	bal := Balance{
+		Date:          date,
+		Amount:        amount,
+		Currency:      aux_bal.Currency,
+		SourceAccount: aux_bal.SourceAccount,
+		//TargetAccount:  aux_bal.TargetAccount,
+		//Padded: aux_bal.Padded,
+	}
+
+	return bal
+}
+
+func isostrToDate(text string) time.Time {
+	var date time.Time
+	if len(text) >= 10 {
+		date, _ = time.Parse("2006-01-02", text[0:10])
+	} else {
+		date = time.Now()
+	}
+	return date
+}
+
+func (aux_note auxiliary_note) ToNote() Note {
+	return Note{
+		Date:        isostrToDate(aux_note.Date),
+		Account:     aux_note.Account,
+		Description: aux_note.Description,
+	}
+}
+
+func (aux_doc auxiliary_document) ToDocument() Document {
+	return Document{
+		Date:     isostrToDate(aux_doc.Date),
+		Account:  aux_doc.Account,
+		Filename: aux_doc.Filename,
+	}
+}
+
+func (aux_txn auxiliary_transaction) ToTransaction() Transaction {
+	txn := Transaction{
+		Date:      isostrToDate(aux_txn.Date),
+		Flag:      aux_txn.Flag,
+		Payee:     s.Replace(aux_txn.Payee, `"`, `'`, -1),
+		Narration: s.Replace(aux_txn.Narration, `"`, `'`, -1),
+	}
+
+	for _, p := range aux_txn.Postings {
+		amount, _ := strconv.ParseFloat(p.Amount, 64)
+		txn.Postings = append(txn.Postings,
+			Posting{
+				Flag:     p.Flag,
+				Account:  p.Account,
+				Amount:   amount,
+				Currency: p.Currency,
+			},
+		)
+	}
+
+	return txn
 }
 
 func MyClassic() *negroni.Negroni {
@@ -494,87 +701,138 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, data)
 }
 
-type auxiliary_posting struct {
-	Flag     string `json:"flag"`
-	Account  string `json:"account"`
-	Amount   string `json:"amount"`
-	Currency string `json:"currency"`
-}
-
-type auxiliary_txn struct {
-	Date      string              `json:"date"`
-	Flag      string              `json:"flag"`
-	Payee     string              `json:"payee"`
-	Narration string              `json:"narration"`
-	Postings  []auxiliary_posting `json:"postings"`
-	Documents []TxnDocument       `json:"documents"`
-}
-
-func saveTransactionHandler(w http.ResponseWriter, r *http.Request) {
+// Uses globals: config
+func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	// Have to decode with auxiliary structs b/c date and numbers come as strings
 	// idea is from https://mlafeldt.github.io/blog/decoding-yaml-in-go/
-	var aux_txn auxiliary_txn
 
-	if err := decoder.Decode(&aux_txn); err != nil {
+	var aux_bill auxiliary_bill
+
+	if err := decoder.Decode(&aux_bill); err != nil {
 		sendError(w, err)
 		return
 	}
 
-	date, _ := time.Parse("2006-01-02", aux_txn.Date[0:10])
+	var bill Bill
 
-	// Filter out empty docs
-	documents := []TxnDocument{}
-	for _, doc := range aux_txn.Documents {
-		if len(doc.Filename) > 0 {
-			documents = append(documents, doc)
+	// Documents
+
+	for _, aux_doc := range aux_bill.Documents {
+		doc := aux_doc.ToDocument()
+		bill.Documents = append(bill.Documents, doc)
+	}
+
+	// Transactions
+
+	for _, aux_txn := range aux_bill.Transactions {
+		txn := aux_txn.ToTransaction()
+		bill.Transactions = append(bill.Transactions, txn)
+	}
+
+	// Balances
+
+	for _, aux_bal := range aux_bill.Balances {
+		bal := aux_bal.ToBalance()
+		bill.Balances = append(bill.Balances, bal)
+	}
+
+	// Notes
+
+	for _, aux_note := range aux_bill.Notes {
+		note := aux_note.ToNote()
+		bill.Notes = append(bill.Notes, note)
+	}
+
+	if err := bill.Save(config); err != nil {
+		if ex, _ := exists(bill.DirPath); ex {
+			os.RemoveAll(bill.DirPath)
 		}
-	}
-
-	txn := Transaction{
-		Date:      date,
-		Flag:      aux_txn.Flag,
-		Payee:     s.Replace(aux_txn.Payee, `"`, `'`, -1),
-		Narration: s.Replace(aux_txn.Narration, `"`, `'`, -1),
-		Documents: documents,
-	}
-
-	for _, p := range aux_txn.Postings {
-		amount, _ := strconv.ParseFloat(p.Amount, 64)
-		txn.Postings = append(txn.Postings,
-			Posting{
-				Flag:     p.Flag,
-				Account:  p.Account,
-				Amount:   amount,
-				Currency: p.Currency,
-			},
-		)
-	}
-
-	if err := txn.Save(config); err != nil {
 		sendError(w, err)
 		return
 	}
-
-	enc := json.NewEncoder(w)
 
 	data := make(map[string]interface{})
 	data["flash"] = "Saved"
 
+	data["dir_path"] = bill.DirPath
+
+	// can't do structs with keys, it only encodes as empty hashes
+	savedpaths := []string{}
+	savedsizes := []int64{}
+
+	filepath.Walk(
+		bill.DirPath,
+		func(path string, f os.FileInfo, err error) error {
+			if !f.IsDir() {
+				savedpaths = append(savedpaths, path)
+				savedsizes = append(savedsizes, f.Size())
+			}
+			return nil
+		},
+	)
+
+	data["saved_paths"] = savedpaths
+	data["saved_sizes"] = savedsizes
+
+	enc := json.NewEncoder(w)
 	w.Header().Set("Content-type", "application/json")
 	enc.Encode(data)
 }
 
+func (c conf) getAccounts() (account []string, err error) {
+	content, err := ioutil.ReadFile(c.MainBeancountFile)
+	if err != nil {
+		return []string{}, err
+	}
+
+	data := []string{}
+	var matches [][]string
+
+	re := regexp.MustCompile(`\n[^ ]+ +open +([^ \n]+)`)
+
+	matches = re.FindAllStringSubmatch(string(content), -1)
+
+	for _, m := range matches {
+		data = append(data, m[1])
+	}
+
+	return data, nil
+}
+
+func (c conf) getCurrencies() (currencies []string, err error) {
+	content, err := ioutil.ReadFile(c.MainBeancountFile)
+	if err != nil {
+		return []string{}, err
+	}
+
+	data := []string{}
+	var matches [][]string
+
+	re := regexp.MustCompile(`\noption "operating_currency" +"([^ \n]+)"`)
+
+	matches = re.FindAllStringSubmatch(string(content), -1)
+
+	for _, m := range matches {
+		data = append(data, m[1])
+	}
+
+	return data, nil
+}
+
+// Uses globals: config
 func completionsHandler(w http.ResponseWriter, r *http.Request) {
 	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
 	paths, _ := filepath.Glob(globpath)
 
-	completions := make(map[string][]string)
+	data := make(map[string][]string)
 
-	completions["payees"] = []string{}
-	completions["tags"] = []string{}
-	completions["links"] = []string{}
+	data["payees"] = []string{}
+	data["tags"] = []string{}
+	data["links"] = []string{}
+	data["accounts"] = []string{}
+	data["currencies"] = []string{}
 
 	for _, path := range paths {
 		c, _ := ioutil.ReadFile(path)
@@ -584,68 +842,38 @@ func completionsHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("%v", err)
 		} else {
 			if len(txn.Payee) > 0 {
-				completions["payees"] = append(completions["payees"], txn.Payee)
+				data["payees"] = append(data["payees"], txn.Payee)
 			}
 			if len(txn.Link) > 0 {
-				completions["links"] = append(completions["links"], txn.Link)
+				data["links"] = append(data["links"], txn.Link)
 			}
 			if len(txn.Tags) > 0 {
 				for _, t := range txn.Tags {
-					completions["tags"] = append(completions["tags"], t)
+					data["tags"] = append(data["tags"], t)
 				}
 			}
 		}
 	}
 
-	completions["payees"] = UniqStr(completions["payees"])
-	completions["tags"] = UniqStr(completions["tags"])
-	completions["links"] = UniqStr(completions["links"])
+	data["payees"] = UniqStr(data["payees"])
+	data["tags"] = UniqStr(data["tags"])
+	data["links"] = UniqStr(data["links"])
 
-	w.Header().Set("Content-type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.Encode(completions)
-}
-
-func accountsHandler(w http.ResponseWriter, r *http.Request) {
-	c, err := ioutil.ReadFile(config.MainBeancountFile)
+	accounts, err := config.getAccounts()
 	if err != nil {
 		sendError(w, err)
 		return
 	}
 
-	data := []string{}
-	var matches [][]string
+	data["accounts"] = accounts
 
-	re := regexp.MustCompile(`\n[^ ]+ +open +([^ \n]+)`)
-
-	matches = re.FindAllStringSubmatch(string(c), -1)
-
-	for _, m := range matches {
-		data = append(data, m[1])
-	}
-
-	w.Header().Set("Content-type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.Encode(data)
-}
-
-func currenciesHandler(w http.ResponseWriter, r *http.Request) {
-	c, err := ioutil.ReadFile(config.MainBeancountFile)
+	currencies, err := config.getCurrencies()
 	if err != nil {
 		sendError(w, err)
 		return
 	}
 
-	data := []string{}
-	var matches [][]string
-
-	re := regexp.MustCompile(`\noption "operating_currency" +"([^ \n]+)"`)
-
-	matches = re.FindAllStringSubmatch(string(c), -1)
-
-	for _, m := range matches {
-		data = append(data, m[1])
-	}
+	data["currencies"] = currencies
 
 	w.Header().Set("Content-type", "application/json")
 	enc := json.NewEncoder(w)
@@ -693,7 +921,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Simulate waiting time for upload during development
 	if developmentMode {
-		time.Sleep(time.Duration(3) * time.Second)
+		time.Sleep(time.Duration(2) * time.Second)
 	}
 
 	w.Header().Set("Content-type", "application/json")
@@ -701,13 +929,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
-func (c conf) updateMainBeancountFile() error {
+func (c conf) updateIncludesBeancountFile() error {
 	var err error
 
 	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
 	paths, _ := filepath.Glob(globpath)
 
-	var txnsTexts []string
+	var billTexts []string
 	var content []byte
 	var text string
 
@@ -716,36 +944,18 @@ func (c conf) updateMainBeancountFile() error {
 			content, _ = ioutil.ReadFile(path)
 			text = string(content) + "\n"
 		} else {
-			text = fmt.Sprintf(`include "%s"`, path)
+			text = fmt.Sprintf(`include %q`, path)
 		}
-		txnsTexts = append(txnsTexts, text)
+		billTexts = append(billTexts, text)
 	}
 
-	content, err = ioutil.ReadFile(config.MainBeancountFile)
-	if err != nil {
-		return err
-	}
-	text = string(content)
-
-	// TODO user config.BillsFolder
-	pre := `;; === Transactions from ./bills ===`
-	post := `;; === Transactions end ===`
-
-	// TODO review regexp
-	re := regexp.MustCompile(pre + `[^=]*` + post)
-	parts := re.Split(text, 2)
-
-	if len(parts) != 2 {
-		return errors.New("couldn't find where to insert Transactions")
-	}
-
-	f, err := os.OpenFile(config.MainBeancountFile, os.O_WRONLY, 0644)
+	f, err := os.OpenFile(config.IncludesBeancountFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	out := fmt.Sprintf("%s%s\n\n%s\n\n%s%s", parts[0], pre, s.Join(txnsTexts, "\n"), post, parts[1])
+	out := s.Join(billTexts, "\n")
 	f.Write([]byte(out))
 
 	return nil
@@ -756,11 +966,11 @@ func (c conf) startWebApp() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/", indexHandler).Methods("GET")
-	router.HandleFunc("/save-transaction", saveTransactionHandler).Methods("POST")
+
+	router.HandleFunc("/save-bill", saveBillHandler).Methods("POST")
 	router.HandleFunc("/upload", uploadHandler).Methods("POST")
+
 	router.HandleFunc("/completions.json", completionsHandler).Methods("GET")
-	router.HandleFunc("/accounts.json", accountsHandler).Methods("GET")
-	router.HandleFunc("/currencies.json", currenciesHandler).Methods("GET")
 
 	n := MyClassic()
 	n.UseHandler(router)
@@ -768,6 +978,8 @@ func (c conf) startWebApp() {
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatal(err)
+		// just to keep spew in the imports
+		spew.Dump(err)
 	}
 
 	// Print welcome message
@@ -791,7 +1003,7 @@ func (c conf) openBrowser() {
 }
 
 func cleanup() {
-	fmt.Println("removing temp folder")
+	log.Println("removing temp folder")
 	os.RemoveAll(appTempDir)
 }
 
@@ -835,7 +1047,7 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		// No arguments, so we're a desktop web app
 		if c.NArg() < 1 {
-			if err = config.updateMainBeancountFile(); err != nil {
+			if err = config.updateIncludesBeancountFile(); err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}

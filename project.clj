@@ -13,6 +13,7 @@
                  [secretary "1.2.3"]
                  [cljs-http "0.1.39"]
                  [org.clojure/core.async "0.2.374"]
+                 [prismatic/dommy "1.1.0"]
                  ]
 
   :plugins [[lein-cljsbuild "1.1.1"]]
