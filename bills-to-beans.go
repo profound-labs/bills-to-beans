@@ -224,7 +224,9 @@ func (d Document) String() string {
 		"%s document %s %q",
 		d.Date.Format("2006-01-02"),
 		d.Account,
-		filepath.Join(d.DirPath, d.Filename),
+		// expected to be relative, written for the document in the same folder as
+		// the beancount file
+		filepath.Join(d.Filename),
 	)
 }
 
@@ -432,10 +434,11 @@ func (b Bill) String() string {
 		strs = append(strs, note.String())
 	}
 
-	for _, doc := range b.Documents {
-		doc.DirPath = b.DirPath
-		strs = append(strs, doc.String())
-	}
+	// TODO front-end will have to fill in missing account and date info
+	//for _, doc := range b.Documents {
+	//	doc.DirPath = b.DirPath
+	//	strs = append(strs, doc.String())
+	//}
 
 	return s.Join(strs, "\n\n")
 }

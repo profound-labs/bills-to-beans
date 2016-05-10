@@ -86,6 +86,7 @@
                           :balances (:balances @bill-data)
                           :notes (:notes @bill-data)}
                          ((fn [h] (update h :documents (fn [a] (remove #(nil? (:filename %)) a)))))
+                         ((fn [h] (update h :documents (fn [a] (map #(document-fill-missing % bill-data) a)))))
                          ((fn [h] (update h :transactions (fn [a] (map #(:data %) a)))))
                          ((fn [h] (update h :transactions str-transactions-amounts)))
                          ((fn [h] (update h :balances (fn [a] (map #(:data %) a)))))

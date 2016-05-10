@@ -53,6 +53,19 @@
   (if-let [narration (get-narration-from-the-middle filename)]
     (swap! data assoc :narration narration)))
 
+;; TODO
+(defn document-fill-missing-date [document data]
+  document)
+
+;; TODO
+(defn document-fill-missing-account [document data]
+  document)
+
+(defn document-fill-missing [document data]
+  (-> document
+      (document-fill-missing-date data)
+      (document-fill-missing-account data)))
+
 (defn <document-input> [data file-id]
   (let [field-name (str "document_file" file-id)
         uploading? (r/atom false)
