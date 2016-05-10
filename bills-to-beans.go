@@ -498,6 +498,10 @@ func (b *Bill) SaveBeancount() error {
 
 	path := filepath.Join(b.DirPath, b.BeancountFilename())
 
+	if ex, _ := exists(path); ex {
+		return errors.New(fmt.Sprintf("Already exists: %s", path))
+	}
+
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -572,6 +576,9 @@ func (b *Bill) SaveDocuments() (err error) {
 
 func (b *Bill) Save(c conf) error {
 	var err error
+
+	// be create about new folders, don't just error out
+	// rather duplicate than delete
 
 	if err = b.EnsureDirPath(); err != nil {
 		return err
@@ -750,9 +757,6 @@ func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bill.Save(config); err != nil {
-		if ex, _ := exists(bill.DirPath); ex {
-			os.RemoveAll(bill.DirPath)
-		}
 		sendError(w, err)
 		return
 	}
@@ -910,6 +914,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	path := filepath.Join(appTempDir, handler.Filename)
 
+	if ex, _ := exists(path); ex {
+		sendError(w, errors.New(fmt.Sprintf("Already exists: %s", path)))
+		return
+	}
+
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		sendError(w, err)
@@ -957,6 +966,7 @@ func (c conf) updateIncludesBeancountFile() error {
 		billTexts = append(billTexts, text)
 	}
 
+	// don't check if exists, overwrite
 	f, err := os.OpenFile(config.IncludesBeancountFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
