@@ -1,3 +1,4 @@
 bills_folder: ./bills
 main_beancount_file: company-finances.beancount
+includes_beancount_file: includes.beancount
 server_port: 3030

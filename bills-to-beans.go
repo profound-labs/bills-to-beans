@@ -36,18 +36,20 @@ var useLocal bool
 var appTempDir string
 
 type conf struct {
-	BillsFolder       string `yaml:"bills_folder"`
-	MainBeancountFile string `yaml:"main_beancount_file"`
-	ServerPort        int    `yaml:"server_port"`
-	InlineBeancounts  bool   `yaml:inline_beancounts`
+	BillsFolder           string `yaml:"bills_folder"`
+	MainBeancountFile     string `yaml:"main_beancount_file"`
+	IncludesBeancountFile string `yaml:"includes_beancount_file"`
+	ServerPort            int    `yaml:"server_port"`
+	InlineBeancounts      bool   `yaml:inline_beancounts`
 }
 
 func (c *conf) readConf() *conf {
 	theconf := conf{
-		BillsFolder:       "./bills",
-		MainBeancountFile: "./bills.beancount",
-		ServerPort:        3030,
-		InlineBeancounts:  false,
+		BillsFolder:           "./bills",
+		MainBeancountFile:     "./bills.beancount",
+		IncludesBeancountFile: "./includes.beancount",
+		ServerPort:            3030,
+		InlineBeancounts:      false,
 	}
 
 	yamlFile, err := ioutil.ReadFile("config.yml")
@@ -579,7 +581,7 @@ func (b *Bill) Save(c conf) error {
 		return err
 	}
 
-	if err = c.updateMainBeancountFile(); err != nil {
+	if err = c.updateIncludesBeancountFile(); err != nil {
 		return err
 	}
 
@@ -927,7 +929,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
-func (c conf) updateMainBeancountFile() error {
+func (c conf) updateIncludesBeancountFile() error {
 	var err error
 
 	globpath := filepath.Join(config.BillsFolder, "*", "*", "*", "*.beancount")
@@ -947,33 +949,13 @@ func (c conf) updateMainBeancountFile() error {
 		billTexts = append(billTexts, text)
 	}
 
-	content, err = ioutil.ReadFile(config.MainBeancountFile)
-	if err != nil {
-		return err
-	}
-	text = string(content)
-
-	// TODO use config.BillsFolder for ./bills
-	pre := `;; === Beancounts from ./bills ===`
-	post := `;; === Beancounts end ===`
-
-	// FIXME already existing beancount inlcudes are not removed
-
-	// TODO review regexp
-	re := regexp.MustCompile(pre + `[^=]*` + post)
-	parts := re.Split(text, 2)
-
-	if len(parts) != 2 {
-		return errors.New("couldn't find where to insert Beancounts")
-	}
-
-	f, err := os.OpenFile(config.MainBeancountFile, os.O_WRONLY, 0644)
+	f, err := os.OpenFile(config.IncludesBeancountFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	out := fmt.Sprintf("%s%s\n\n%s\n\n%s%s", parts[0], pre, s.Join(billTexts, "\n"), post, parts[1])
+	out := s.Join(billTexts, "\n")
 	f.Write([]byte(out))
 
 	return nil
@@ -1065,7 +1047,7 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		// No arguments, so we're a desktop web app
 		if c.NArg() < 1 {
-			if err = config.updateMainBeancountFile(); err != nil {
+			if err = config.updateIncludesBeancountFile(); err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
