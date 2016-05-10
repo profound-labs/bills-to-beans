@@ -10,7 +10,8 @@
              :refer [flash! get-resource! first-assets-account
                      first-expenses-account filesize-str]]
             [bills-to-beans.payees :refer [<payees-list>]]
-            [bills-to-beans.documents :refer [<document-upload>]]
+            [bills-to-beans.documents
+             :refer [<document-upload> document-fill-missing]]
             [bills-to-beans.transactions
              :as transactions
              :refer [<new-transaction-form> default-transaction
