@@ -17,6 +17,9 @@
             [bills-to-beans.balances
              :as balances
              :refer [<new-balance-form> default-balance validate-all-balances!]]
+            [bills-to-beans.notes
+             :as notes
+             :refer [<new-note-form> default-note validate-all-notes!]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
@@ -79,18 +82,20 @@
                     {:json-params
                      (-> {:documents (:documents @bill-data)
                           :transactions (:transactions @bill-data)
-                          :balances (:balances @bill-data)}
+                          :balances (:balances @bill-data)
+                          :notes (:notes @bill-data)}
                          ((fn [h] (update h :documents (fn [a] (remove #(nil? (:filename %)) a)))))
                          ((fn [h] (update h :transactions (fn [a] (map #(:data %) a)))))
                          ((fn [h] (update h :transactions str-transactions-amounts)))
                          ((fn [h] (update h :balances (fn [a] (map #(:data %) a)))))
                          ((fn [h] (update h :balances str-balances-amounts)))
-                         ((fn [h] (do (prn h) h)))
+                         ((fn [h] (update h :notes (fn [a] (map #(:data %) a)))))
                          )}))
 
         save-bill! (fn [_]
                      (when (and (validate-all-transactions! bill-data)
-                                (validate-all-balances! bill-data))
+                                (validate-all-balances! bill-data)
+                                (validate-all-notes! bill-data))
                          (do (go (let [response (<! (req-save))]
                                    (if (:success response)
                                      (let [notice [<saved-files-notice>
@@ -102,7 +107,8 @@
                                                   [{:filename nil :size nil}])
                                            (swap! bill-data assoc :transactions
                                                   [{:data @default-transaction :ui {}}])
-                                           (swap! bill-data assoc :balances []))
+                                           (swap! bill-data assoc :balances [])
+                                           (swap! bill-data assoc :notes []))
 
                                        (flash! response notice))
                                      (flash! response)
@@ -111,14 +117,20 @@
         add-default-transaction! (fn [_] (swap! bill-data update :transactions
                                                 (fn [a] (conj a {:data @default-transaction :ui {}}))))
 
-        remove-transaction! (fn [idx] (do (swap! bill-data assoc-in [:transactions idx] nil)
-                                          (swap! bill-data update :transactions #(into [] (remove nil? %)))))
-
         add-default-balance! (fn [_] (swap! bill-data update :balances
                                             (fn [a] (conj a {:data @default-balance :ui {}}))))
 
+        add-default-note! (fn [_] (swap! bill-data update :notes
+                                            (fn [a] (conj a {:data @default-note :ui {}}))))
+
+        remove-transaction! (fn [idx] (do (swap! bill-data assoc-in [:transactions idx] nil)
+                                          (swap! bill-data update :transactions #(into [] (remove nil? %)))))
+
         remove-balance! (fn [idx] (do (swap! bill-data assoc-in [:balances idx] nil)
                                       (swap! bill-data update :balances #(into [] (remove nil? %)))))
+
+        remove-note! (fn [idx] (do (swap! bill-data assoc-in [:notes idx] nil)
+                                      (swap! bill-data update :notes #(into [] (remove nil? %)))))
         ]
 
     (r/create-class {:component-will-mount
@@ -128,12 +140,15 @@
                                       (fn [res]
                                         (transactions/set-accounts default-transaction (:accounts res))
                                         (balances/set-accounts default-balance (:accounts res))
+                                        (notes/set-accounts default-note (:accounts res))
                                         (transactions/set-currencies default-transaction (:currencies res))
                                         (balances/set-currencies default-balance (:currencies res))
                                         (swap! bill-data update :transactions
                                                (fn [a] (into [] (map #(assoc % :data @default-transaction) a))))
                                         (swap! bill-data update :balances
                                                (fn [a] (into [] (map #(assoc % :data @default-balance) a))))
+                                        (swap! bill-data update :notes
+                                               (fn [a] (into [] (map #(assoc % :data @default-note) a))))
                                         )))
 
                      :reagent-render
@@ -182,7 +197,7 @@
                           (doall
                            (map-indexed
                             (fn [idx _]
-                              ^{:key (str "txn" idx)}
+                              ^{:key (str "bal" idx)}
                               [:div [:div.row [:h4 "Balances"]]
                                [:div.row
                                 [:div.col-sm-12
@@ -201,6 +216,29 @@
                            [:div.col-sm-12
                             [:button.btn.btn-default {:on-click add-default-balance!}
                              [:i.fa.fa-plus] " Balance"]]]
+
+                          (doall
+                           (map-indexed
+                            (fn [idx _]
+                              ^{:key (str "note" idx)}
+                              [:div [:div.row [:h4 "Notes"]]
+                               [:div.row
+                                [:div.col-sm-12
+                                 [<new-note-form>
+                                  (r/cursor bill-data [:notes idx :data])
+                                  (r/cursor bill-data [:notes idx :ui])
+                                  completions]]]
+                               [:div.row
+                                [:div.col-sm-12 {:style {:textAlign "right"}}
+                                 [:button.btn.btn-default {:on-click (fn [_] (remove-note! idx))}
+                                  [:i.fa.fa-remove]]]]
+                               ])
+                            (:notes @bill-data)))
+
+                          [:div.row
+                           [:div.col-sm-12
+                            [:button.btn.btn-default {:on-click add-default-note!}
+                             [:i.fa.fa-plus] " Note"]]]
 
                           [:div.row {:style {:marginTop "2em"}}
                            [:div.col-sm-12

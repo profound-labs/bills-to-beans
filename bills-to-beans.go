@@ -208,6 +208,15 @@ func figletString(text string) string {
 	return renderStr
 }
 
+func (n Note) String() string {
+	return fmt.Sprintf(
+		"%s note %s %q",
+		n.Date.Format("2006-01-02"),
+		n.Account,
+		n.Description,
+	)
+}
+
 func (d Document) String() string {
 	return fmt.Sprintf(
 		"%s document %s %q",
@@ -371,6 +380,14 @@ func (t Transaction) sumAmountFmt() string {
 	return ""
 }
 
+func (note Note) sanitizedBase() string {
+	parts := []string{
+		note.Date.Format("2006-01-02"),
+		"note",
+	}
+	return sanitizeFilename(s.Join(parts, " _ "))
+}
+
 func (bal Balance) sanitizedBase() string {
 	parts := []string{
 		bal.Date.Format("2006-01-02"),
@@ -409,10 +426,9 @@ func (b Bill) String() string {
 		strs = append(strs, bal.String())
 	}
 
-	// TODO
-	//for _, note := range b.Notes {
-	//	strs = append(strs, note.String())
-	//}
+	for _, note := range b.Notes {
+		strs = append(strs, note.String())
+	}
 
 	for _, doc := range b.Documents {
 		doc.DirPath = b.DirPath
@@ -444,8 +460,16 @@ func (b *Bill) EnsureDirPath() error {
 			fmt.Sprintf("%02d", bal.Date.Month()),
 			bal.sanitizedBase(),
 		)
+	} else if len(b.Notes) > 0 {
+		note := b.Notes[0]
+		b.DirPath = filepath.Join(
+			config.BillsFolder,
+			fmt.Sprintf("%04d", note.Date.Year()),
+			fmt.Sprintf("%02d", note.Date.Month()),
+			note.sanitizedBase(),
+		)
 	} else {
-		return errors.New(fmt.Sprintf("Need at least one transaction or balance"))
+		return errors.New(fmt.Sprintf("Need at least one transaction, balance or note"))
 	}
 
 	if ex, _ := exists(b.DirPath); ex {
@@ -583,28 +607,35 @@ func (aux_bal auxiliary_balance) ToBalance() Balance {
 	return bal
 }
 
-func (aux_doc auxiliary_document) ToDocument() Document {
+func isostrToDate(text string) time.Time {
 	var date time.Time
-	if len(aux_doc.Date) >= 10 {
-		date, _ = time.Parse("2006-01-02", aux_doc.Date[0:10])
+	if len(text) >= 10 {
+		date, _ = time.Parse("2006-01-02", text[0:10])
 	} else {
 		date = time.Now()
 	}
+	return date
+}
 
-	doc := Document{
-		Date:     date,
+func (aux_note auxiliary_note) ToNote() Note {
+	return Note{
+		Date:        isostrToDate(aux_note.Date),
+		Account:     aux_note.Account,
+		Description: aux_note.Description,
+	}
+}
+
+func (aux_doc auxiliary_document) ToDocument() Document {
+	return Document{
+		Date:     isostrToDate(aux_doc.Date),
 		Account:  aux_doc.Account,
 		Filename: aux_doc.Filename,
 	}
-
-	return doc
 }
 
 func (aux_txn auxiliary_transaction) ToTransaction() Transaction {
-	date, _ := time.Parse("2006-01-02", aux_txn.Date[0:10])
-
 	txn := Transaction{
-		Date:      date,
+		Date:      isostrToDate(aux_txn.Date),
 		Flag:      aux_txn.Flag,
 		Payee:     s.Replace(aux_txn.Payee, `"`, `'`, -1),
 		Narration: s.Replace(aux_txn.Narration, `"`, `'`, -1),
@@ -702,6 +733,13 @@ func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 	for _, aux_bal := range aux_bill.Balances {
 		bal := aux_bal.ToBalance()
 		bill.Balances = append(bill.Balances, bal)
+	}
+
+	// Notes
+
+	for _, aux_note := range aux_bill.Notes {
+		note := aux_note.ToNote()
+		bill.Notes = append(bill.Notes, note)
 	}
 
 	if err := bill.Save(config); err != nil {
