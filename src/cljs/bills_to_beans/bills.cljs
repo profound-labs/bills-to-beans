@@ -9,6 +9,7 @@
             [bills-to-beans.helpers
              :refer [flash! get-resource!
                      first-assets-account first-expenses-account]]
+            [bills-to-beans.payees :refer [<payees-list>]]
             [bills-to-beans.documents :refer [<document-upload>]]
             [bills-to-beans.transactions
              :as transactions
@@ -24,7 +25,7 @@
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
 
-(declare <payees-list> <notes>)
+(declare <tips>)
 
 (defonce bill-data (r/atom {:documents [{:filename nil :size nil}]
                             :transactions [{:data @default-transaction :ui {}}]
@@ -158,7 +159,7 @@
 
                          [:div.col-sm-2
                           [:h4 "Payees"]
-                          [<payees-list> (:payees @completions)]]
+                          [<payees-list> bill-data]]
 
                          [:div.col-sm-10
 
@@ -248,26 +249,14 @@
 
                           [:div.row
                            [:div.col-sm-3.pull-right
-                            [<notes>]]]
+                            [<tips>]]]
 
                           ]
 
                          ]]
                        )})))
 
-(defn <payees-list> [payees]
-  (fn []
-    (let [set-payee! (fn [e]
-                       (prn "set payee in the active transaction")
-                       #_(let [payee (.-target.innerText e)]
-                         (swap! transaction-data assoc :payee payee)))]
-      [:div.list-group
-       (map-indexed (fn [idx p]
-                      ^{:key (str "payee" idx)}
-                      [:button.list-group-item {:type "button" :on-click set-payee!} p])
-                    payees)])))
-
-(defn <notes> []
+(defn <tips> []
   [:div
    [:p "Usually:"]
    [:table.table

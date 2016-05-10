@@ -510,12 +510,13 @@ func (t *Transaction) ParseBeancount(text string) error {
 	text = s.TrimSpace(text)
 	firstLine := s.TrimSpace(s.Split(text, "\n")[0])
 
-	re := regexp.MustCompile(`^([^ ]+) ([\*\!]) *("[^"]+")? *("[^"]+")?`)
+	re := regexp.MustCompile(`^([^ ]+) ([\*\!]) *("[^"]+")?[ \|]*("[^"]+")?`)
 	matches := re.FindStringSubmatch(firstLine)
 
 	if len(matches) > 0 {
 		t.Date, _ = time.Parse("2006-01-02", matches[1])
 		t.Flag = matches[2]
+		// matches[0] is the complete matched string
 		if len(matches[4]) > 0 {
 			t.Payee = s.Trim(matches[3], `"`)
 			t.Narration = s.Trim(matches[4], `"`)

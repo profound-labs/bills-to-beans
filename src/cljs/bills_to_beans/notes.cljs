@@ -24,7 +24,7 @@
   (v/validate! data ui-state
                (v/present [:account] "Must have")
                (v/present [:date] "Must have")
-               (not-zero? [:description] "Must have")))
+               (v/present [:description] "Must have")))
 
 (defn validate-all-notes! [data]
   (if (= 0 (count (:notes @data)))
