@@ -13,6 +13,7 @@ import (
 	"log"
 	"math"
 	"os/signal"
+	"sort"
 	"syscall"
 	//"github.com/jung-kurt/gofpdf"
 	"github.com/imdario/mergo"
@@ -861,6 +862,10 @@ func completionsHandler(w http.ResponseWriter, r *http.Request) {
 	data["payees"] = UniqStr(data["payees"])
 	data["tags"] = UniqStr(data["tags"])
 	data["links"] = UniqStr(data["links"])
+
+	sort.Sort(sort.StringSlice(data["payees"]))
+	sort.Sort(sort.StringSlice(data["tags"]))
+	sort.Sort(sort.StringSlice(data["links"]))
 
 	accounts, err := config.getAccounts()
 	if err != nil {
