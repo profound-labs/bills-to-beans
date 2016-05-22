@@ -45,6 +45,9 @@
     (format "%.1f kB", (/ bytes 1024))
     (format "%.1f MB", (/ bytes (* 1024 1024)))))
 
+(defn todayiso []
+  (subs (.toISOString (js/Date.)) 0 10))
+
 ;; dommy/test/dommy/test_utils.cljs
 (defn fire!
   "Creates an event of type `event-type`, optionally having

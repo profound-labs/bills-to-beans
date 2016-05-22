@@ -117,14 +117,32 @@
                                      (flash! response)
                                      ))))))
 
-        add-default-transaction! (fn [_] (swap! bill-data update :transactions
-                                                (fn [a] (conj a {:data @default-transaction :ui {}}))))
+        add-new-transaction! (fn [_] (swap! bill-data update :transactions
+                                            (fn [a]
+                                              (conj a {:data
+                                                       (if (= 0 (count (:transactions @bill-data)))
+                                                         @default-transaction
+                                                         (assoc @default-transaction :date
+                                                                (:date (:data (peek (:transactions @bill-data))))))
+                                                       :ui {}}))))
 
-        add-default-balance! (fn [_] (swap! bill-data update :balances
-                                            (fn [a] (conj a {:data @default-balance :ui {}}))))
+        add-new-balance! (fn [_] (swap! bill-data update :balances
+                                        (fn [a]
+                                          (conj a {:data
+                                                   (if (= 0 (count (:balances @bill-data)))
+                                                     @default-balance
+                                                     (assoc @default-balance :date
+                                                            (:date (:data (peek (:balances @bill-data))))))
+                                                   :ui {}}))))
 
-        add-default-note! (fn [_] (swap! bill-data update :notes
-                                            (fn [a] (conj a {:data @default-note :ui {}}))))
+        add-new-note! (fn [_] (swap! bill-data update :notes
+                                     (fn [a]
+                                       (conj a {:data
+                                                (if (= 0 (count (:notes @bill-data)))
+                                                  @default-note
+                                                  (assoc @default-note :date
+                                                         (:date (:data (peek (:notes @bill-data))))))
+                                                :ui {}}))))
 
         remove-transaction! (fn [idx] (do (swap! bill-data assoc-in [:transactions idx] nil)
                                           (swap! bill-data update :transactions #(into [] (remove nil? %)))))
@@ -194,7 +212,7 @@
 
                           [:div.row
                            [:div.col-sm-12
-                            [:button.btn.btn-default {:on-click add-default-transaction!}
+                            [:button.btn.btn-default {:on-click add-new-transaction!}
                              [:i.fa.fa-plus] " Transaction"]]]
 
                           (doall
@@ -217,7 +235,7 @@
 
                           [:div.row
                            [:div.col-sm-12
-                            [:button.btn.btn-default {:on-click add-default-balance!}
+                            [:button.btn.btn-default {:on-click add-new-balance!}
                              [:i.fa.fa-plus] " Balance"]]]
 
                           (doall
@@ -240,7 +258,7 @@
 
                           [:div.row
                            [:div.col-sm-12
-                            [:button.btn.btn-default {:on-click add-default-note!}
+                            [:button.btn.btn-default {:on-click add-new-note!}
                              [:i.fa.fa-plus] " Note"]]]
 
                           [:div.row {:style {:marginTop "3em"}}

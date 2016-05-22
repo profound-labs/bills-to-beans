@@ -7,13 +7,13 @@
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
             [bills-to-beans.helpers
-             :refer [not-zero? first-assets-account first-expenses-account]]
+             :refer [not-zero? first-assets-account first-expenses-account todayiso]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
 
 (defonce default-transaction
-  (r/atom {:date (subs (.toISOString (js/Date.)) 0 10)
+  (r/atom {:date (todayiso)
            :flag "*"
            :payee nil
            :narration nil
@@ -35,10 +35,10 @@
     (let [other-idx (if (= 0 changed-idx) 1 0)]
       (swap! data assoc-in
              [:postings other-idx :amount]
-             (* -1 (get-in @data [:postings changed-idx :amount])))
+             (format "%.2f" (* -1 (get-in @data [:postings changed-idx :amount]))))
       (swap! data assoc-in
              [:postings other-idx :currency]
-             (get-in @data [:postings changed-idx :currency]))
+             (format "%.2f" (get-in @data [:postings changed-idx :currency])))
       )))
 
 (defn <posting-amount> [idx data ui-state]

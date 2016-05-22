@@ -7,13 +7,14 @@
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
             [bills-to-beans.helpers
-             :refer [not-zero? first-assets-account first-expenses-account]]
+             :refer [not-zero? first-assets-account first-expenses-account
+                     todayiso]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
 
 (defonce default-note
-  (r/atom {:date (subs (.toISOString (js/Date.)) 0 10)
+  (r/atom {:date (todayiso) 
            :account ""
            :description ""}))
 

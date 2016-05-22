@@ -7,7 +7,8 @@
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
             [dommy.core :refer-macros [sel sel1]]
-            [bills-to-beans.helpers :refer [flash! fire! filesize-str]]
+            [bills-to-beans.helpers
+             :refer [flash! fire! filesize-str todayiso]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
@@ -43,15 +44,36 @@
       (string/replace #"^[ _-]*" "")
       (string/replace #"[ _-]*$" "")))
 
-(defn parse-filename! [data filename]
-  (if-let [date (get-date-from-the-beginning filename)]
-    (swap! data assoc :date date))
-  (if-let [amount (get-amount-from-the-end filename)]
-    (do
-      (swap! data update-in [:postings 0 :amount] (fn [_] (* -1 amount)))
-      (swap! data update-in [:postings 1 :amount] (fn [_] amount))))
-  (if-let [narration (get-narration-from-the-middle filename)]
-    (swap! data assoc :narration narration)))
+(defn parse-filename-for-transaction! [data filename]
+  (when (or (string/blank? (:date @data))
+            (= (todayiso) (:date @data)))
+    (if-let [date (get-date-from-the-beginning filename)]
+      (swap! data assoc :date date)))
+  (when (or (string/blank? (get-in @data [:postings 0 :amount]))
+            (= 0.00 (js/parseFloat (get-in @data [:postings 0 :amount]))))
+   (if-let [amount (get-amount-from-the-end filename)]
+     (do
+       (swap! data update-in [:postings 0 :amount] (fn [_] (format "%.2f" (* -1 amount))))
+       (swap! data update-in [:postings 1 :amount] (fn [_] (format "%.2f" amount))))))
+  (when (string/blank? (:narration @data))
+   (if-let [narration (get-narration-from-the-middle filename)]
+     (swap! data assoc :narration narration))))
+
+(defn parse-filename-for-balance! [data filename]
+  (when (or (string/blank? (:date @data))
+            (= (todayiso) (:date @data)))
+    (if-let [date (get-date-from-the-beginning filename)]
+      (swap! data assoc :date date)))
+  (when (or (string/blank? (:amount @data))
+            (= 0.00 (js/parseFloat (:amount @data))))
+    (if-let [amount (get-amount-from-the-end filename)]
+      (swap! data update :amount (fn [_] (format "%.2f" (* -1 amount)))))))
+
+(defn parse-filename-for-note! [data filename]
+  (when (or (string/blank? (:date @data))
+            (= (todayiso) (:date @data)))
+    (if-let [date (get-date-from-the-beginning filename)]
+      (swap! data assoc :date date))))
 
 ;; TODO
 (defn document-fill-missing-date [document data]
@@ -88,7 +110,22 @@
                                      (let [document (:body response)]
                                        (reset! uploading? false)
                                        (update-document-data! data document file-id)
-                                       (parse-filename! (r/cursor data [:transactions 0 :data]) (:filename document)))
+
+                                       (when-not (nil? (get-in @data [:transactions 0]))
+                                         (parse-filename-for-transaction!
+                                         (r/cursor data [:transactions 0 :data])
+                                         (:filename document)))
+
+                                       (when-not (nil? (get-in @data [:balances 0]))
+                                         (parse-filename-for-balance!
+                                          (r/cursor data [:balances 0 :data])
+                                          (:filename document)))
+
+                                       (when-not (nil? (get-in @data [:notes 0]))
+                                         (parse-filename-for-note!
+                                          (r/cursor data [:notes 0 :data])
+                                          (:filename document)))
+                                       )
                                      (flash! response)
                                      )))))))
 
