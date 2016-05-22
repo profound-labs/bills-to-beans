@@ -44,11 +44,14 @@
       (string/replace #"^[ _-]*" "")
       (string/replace #"[ _-]*$" "")))
 
+(defn parse-date [data filename]
+  (when-let [date (get-date-from-the-beginning filename)]
+    (when (or (string/blank? (:date @data))
+              (= (todayiso) (:date @data)))
+      (swap! data assoc :date date))))
+
 (defn parse-filename-for-transaction! [data filename]
-  (when (or (string/blank? (:date @data))
-            (= (todayiso) (:date @data)))
-    (if-let [date (get-date-from-the-beginning filename)]
-      (swap! data assoc :date date)))
+  (parse-date data filename)
   (when (or (string/blank? (get-in @data [:postings 0 :amount]))
             (= 0.00 (js/parseFloat (get-in @data [:postings 0 :amount]))))
    (if-let [amount (get-amount-from-the-end filename)]
@@ -60,20 +63,14 @@
      (swap! data assoc :narration narration))))
 
 (defn parse-filename-for-balance! [data filename]
-  (when (or (string/blank? (:date @data))
-            (= (todayiso) (:date @data)))
-    (if-let [date (get-date-from-the-beginning filename)]
-      (swap! data assoc :date date)))
+  (parse-date data filename)
   (when (or (string/blank? (:amount @data))
             (= 0.00 (js/parseFloat (:amount @data))))
     (if-let [amount (get-amount-from-the-end filename)]
       (swap! data update :amount (fn [_] (format "%.2f" (* -1 amount)))))))
 
 (defn parse-filename-for-note! [data filename]
-  (when (or (string/blank? (:date @data))
-            (= (todayiso) (:date @data)))
-    (if-let [date (get-date-from-the-beginning filename)]
-      (swap! data assoc :date date))))
+  (parse-date data filename))
 
 ;; TODO
 (defn document-fill-missing-date [document data]
