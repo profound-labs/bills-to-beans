@@ -7,7 +7,7 @@
             [reforms.reagent :include-macros true :as f]
             [reforms.validation :include-macros true :as v]
             [bills-to-beans.helpers
-             :refer [flash! get-resource! first-assets-account
+             :refer [flash! get-resource! new-tempdir! first-assets-account
                      first-expenses-account filesize-str]]
             [bills-to-beans.payees :refer [<payees-list>]]
             [bills-to-beans.documents
@@ -156,6 +156,7 @@
 
     (r/create-class {:component-will-mount
                      (fn []
+                       (new-tempdir!)
                        (get-resource! "/completions.json"
                                       completions
                                       (fn [res]

@@ -28,6 +28,16 @@
           ;; Flash error
           (flash! response)))))
 
+(defn new-tempdir! []
+  (go (http/post "/new-tempdir")))
+
+(defn remove-from-tempdir! [filename]
+  (go (let [response (<! (http/post
+                          "/remove-from-tempdir"
+                          {:form-params {:filename filename}}))]
+        (when-not (:success response)
+          (flash! response)))))
+
 (defn first-assets-account [accounts]
   "Assets:PT:Bank:Current")
 

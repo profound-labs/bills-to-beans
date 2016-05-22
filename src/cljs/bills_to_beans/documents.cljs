@@ -8,7 +8,7 @@
             [reforms.validation :include-macros true :as v]
             [dommy.core :refer-macros [sel sel1]]
             [bills-to-beans.helpers
-             :refer [flash! fire! filesize-str todayiso]]
+             :refer [flash! fire! filesize-str todayiso remove-from-tempdir!]]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
             [clojure.string :as string]))
@@ -129,8 +129,10 @@
                                      (flash! response)
                                      )))))))
 
-        remove-document! (fn [file-id] (do (swap! data assoc-in [:documents file-id] nil)
-                                           (swap! data update :documents #(into [] (remove nil? %)))))
+        remove-document! (fn [file-id] (do (remove-from-tempdir! (get-in @data [:documents file-id :filename]))
+                                           (swap! data assoc-in [:documents file-id] nil)
+                                           (swap! data update :documents #(into [] (remove nil? %)))
+                                           ))
 
         filename (r/cursor data [:documents file-id :filename])
         size (r/cursor data [:documents file-id :size])]

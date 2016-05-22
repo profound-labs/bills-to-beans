@@ -712,7 +712,30 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, data)
 }
 
-// Uses globals: config
+// Uses globals: appTempDir
+func createNewTempdir(w http.ResponseWriter, r *http.Request) {
+	os.RemoveAll(appTempDir)
+	appTempDir, _ = ioutil.TempDir(os.TempDir(), "bills_")
+}
+
+// Uses globals: appTempDir
+func removeFromTempdir(w http.ResponseWriter, r *http.Request) {
+	var err error
+
+	if err = r.ParseForm(); err != nil {
+		sendError(w, errors.New("Could not remove file"))
+		return
+	}
+
+	filename := r.PostFormValue("filename")
+
+	if err = os.Remove(filepath.Join(appTempDir, filename)); err != nil {
+		sendError(w, errors.New(fmt.Sprintf("Could not remove file: %s", filename)))
+		return
+	}
+}
+
+// Uses globals: config, appTempDir
 func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
@@ -760,6 +783,9 @@ func saveBillHandler(w http.ResponseWriter, r *http.Request) {
 		sendError(w, err)
 		return
 	}
+
+	os.RemoveAll(appTempDir)
+	appTempDir, _ = ioutil.TempDir(os.TempDir(), "bills_")
 
 	data := make(map[string]interface{})
 	data["flash"] = "Saved"
@@ -987,6 +1013,9 @@ func (c conf) startWebApp() {
 
 	router.HandleFunc("/save-bill", saveBillHandler).Methods("POST")
 	router.HandleFunc("/upload", uploadHandler).Methods("POST")
+
+	router.HandleFunc("/new-tempdir", createNewTempdir).Methods("POST")
+	router.HandleFunc("/remove-from-tempdir", removeFromTempdir).Methods("POST")
 
 	router.HandleFunc("/completions.json", completionsHandler).Methods("GET")
 
