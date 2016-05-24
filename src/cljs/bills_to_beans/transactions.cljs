@@ -38,7 +38,7 @@
              (format "%.2f" (* -1 (get-in @data [:postings changed-idx :amount]))))
       (swap! data assoc-in
              [:postings other-idx :currency]
-             (format "%.2f" (get-in @data [:postings changed-idx :currency])))
+             (get-in @data [:postings changed-idx :currency]))
       )))
 
 (defn <posting-amount> [idx data ui-state]
