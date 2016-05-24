@@ -99,23 +99,23 @@
                      (when (and (validate-all-transactions! bill-data)
                                 (validate-all-balances! bill-data)
                                 (validate-all-notes! bill-data))
-                         (do (go (let [response (<! (req-save))]
-                                   (if (:success response)
-                                     (let [notice [<saved-files-notice>
-                                                   (get-in response [:body :dir_path])
-                                                   (get-in response [:body :saved_paths])
-                                                   (get-in response [:body :saved_sizes])]]
+                       (go (let [response (<! (req-save))]
+                             (if (:success response)
+                               (let [notice [<saved-files-notice>
+                                             (get-in response [:body :dir_path])
+                                             (get-in response [:body :saved_paths])
+                                             (get-in response [:body :saved_sizes])]]
 
-                                       (do (swap! bill-data assoc :documents
-                                                  [{:filename nil :size nil}])
-                                           (swap! bill-data assoc :transactions
-                                                  [{:data @default-transaction :ui {}}])
-                                           (swap! bill-data assoc :balances [])
-                                           (swap! bill-data assoc :notes []))
+                                 (do (swap! bill-data assoc :documents
+                                            [{:filename nil :size nil}])
+                                     (swap! bill-data assoc :transactions
+                                            [{:data @default-transaction :ui {}}])
+                                     (swap! bill-data assoc :balances [])
+                                     (swap! bill-data assoc :notes []))
 
-                                       (flash! response notice))
-                                     (flash! response)
-                                     ))))))
+                                 (flash! response notice))
+                               (flash! response)
+                               )))))
 
         add-new-transaction! (fn [_] (swap! bill-data update :transactions
                                             (fn [a]
