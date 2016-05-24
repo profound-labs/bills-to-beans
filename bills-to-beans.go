@@ -168,7 +168,8 @@ type auxiliary_bill struct {
 }
 
 func sanitizeFilename(text string) string {
-	out := regexp.MustCompile(`[^\w\.\'ãÃõÕáÁâÂíÍóÓêÊôÔéÉçÇ€£\$-]`).ReplaceAllString(text, " ")
+	portuguese := `ãâáàẽêéèĩîíìõôóòũûúùçÃÂÁÀẼÊÉÈĨÎÍÌÕÔÓÒŨÛÚÙÇ`
+	out := regexp.MustCompile(`[^\w\.\'`+portuguese+`€£\$-]`).ReplaceAllString(text, " ")
 	out = regexp.MustCompile(`  +`).ReplaceAllString(out, " ")
 	return out
 }
