@@ -974,6 +974,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(data)
 }
 
+// uses globals: config
 func (c conf) updateIncludesBeancountFile() error {
 	var err error
 
@@ -989,7 +990,8 @@ func (c conf) updateIncludesBeancountFile() error {
 			content, _ = ioutil.ReadFile(path)
 			text = string(content) + "\n"
 		} else {
-			text = fmt.Sprintf(`include %q`, path)
+			relpath, _ := filepath.Rel(filepath.Dir(config.IncludesBeancountFile), path)
+			text = fmt.Sprintf(`include %q`, relpath)
 		}
 		billTexts = append(billTexts, text)
 	}
