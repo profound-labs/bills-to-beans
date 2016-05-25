@@ -1056,12 +1056,20 @@ func (c conf) openBrowser() {
 }
 
 func cleanup() {
-	log.Println("removing temp folder")
+	log.Printf("removing app temp folder %s", appTempDir)
 	os.RemoveAll(appTempDir)
 }
 
 // uses globals: config
 func actionWatch(c *cli.Context) error {
+	var err error
+	fmt.Println(figletString("WATCH"))
+
+	log.Printf("Updating %s\n", config.IncludesBeancountFile)
+	if err = config.updateIncludesBeancountFile(); err != nil {
+		log.Println(err)
+	}
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -1073,12 +1081,19 @@ func actionWatch(c *cli.Context) error {
 		for {
 			select {
 			case event := <-watcher.Events:
-				if path.Ext(event.Name) == ".beancount" &&
-					(event.Op&fsnotify.Create == fsnotify.Create ||
-						event.Op&fsnotify.Remove == fsnotify.Remove) {
+				if path.Ext(event.Name) == ".beancount" && (event.Op&fsnotify.Create == fsnotify.Create || event.Op&fsnotify.Remove == fsnotify.Remove) {
 
-					log.Println("file:", event.Name)
-					log.Printf("updating %s\n", config.IncludesBeancountFile)
+					var word string
+
+					if event.Op&fsnotify.Create == fsnotify.Create {
+						word = "create"
+					}
+					if event.Op&fsnotify.Remove == fsnotify.Remove {
+						word = "remove"
+					}
+
+					log.Printf("File %s event: %s\n", word, event.Name)
+					log.Printf("Updating %s\n", config.IncludesBeancountFile)
 					if err = config.updateIncludesBeancountFile(); err != nil {
 						log.Println(err)
 					}
@@ -1089,6 +1104,8 @@ func actionWatch(c *cli.Context) error {
 			}
 		}
 	}()
+
+	fmt.Printf("Watching %s for changes...\n", config.BillsFolder)
 
 	filepath.Walk(
 		config.BillsFolder,
@@ -1101,9 +1118,6 @@ func actionWatch(c *cli.Context) error {
 			return nil
 		},
 	)
-
-	fmt.Println(figletString("WATCH"))
-	fmt.Printf("Watching %s for changes...\n", config.BillsFolder)
 
 	<-done
 
