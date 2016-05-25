@@ -7,6 +7,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/codegangsta/negroni"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/fsnotify/fsnotify"
 	"github.com/getwe/figlet4go"
 	"github.com/gorilla/mux"
 	"github.com/skratchdot/open-golang/open"
@@ -24,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -1035,7 +1037,7 @@ func (c conf) startWebApp() {
 
 	// Print welcome message
 	fmt.Println(figletString("B2B"))
-	fmt.Println(fmt.Sprintf("Listening on http://localhost:%d", port))
+	fmt.Printf("Listening on http://localhost:%d\n", port)
 
 	config.openBrowser()
 
@@ -1058,12 +1060,62 @@ func cleanup() {
 	os.RemoveAll(appTempDir)
 }
 
+// uses globals: config
+func actionWatch(c *cli.Context) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
+
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case event := <-watcher.Events:
+				if path.Ext(event.Name) == ".beancount" &&
+					(event.Op&fsnotify.Create == fsnotify.Create ||
+						event.Op&fsnotify.Remove == fsnotify.Remove) {
+
+					log.Println("file:", event.Name)
+					log.Printf("updating %s\n", config.IncludesBeancountFile)
+					if err = config.updateIncludesBeancountFile(); err != nil {
+						log.Println(err)
+					}
+
+				}
+			case err := <-watcher.Errors:
+				log.Println("error:", err)
+			}
+		}
+	}()
+
+	filepath.Walk(
+		config.BillsFolder,
+		func(path string, f os.FileInfo, err error) error {
+			if f.IsDir() {
+				if err = watcher.Add(path); err != nil {
+					log.Fatal(err)
+				}
+			}
+			return nil
+		},
+	)
+
+	fmt.Println(figletString("WATCH"))
+	fmt.Printf("Watching %s for changes...\n", config.BillsFolder)
+
+	<-done
+
+	return nil
+}
+
 func main() {
 	var err error
 
 	app := cli.NewApp()
 	app.Name = "bills-to-beans"
-	app.Usage = "bills-to-beans"
+	app.Usage = "helper app to record bills in beancount format"
 
 	config.readConf()
 
@@ -1095,7 +1147,15 @@ func main() {
 		os.Exit(1)
 	}()
 
-	app.Action = func(c *cli.Context) {
+	app.Commands = []cli.Command{
+		{
+			Name:   "watch",
+			Usage:  "watch the bills folder for changes and update the includes file",
+			Action: actionWatch,
+		},
+	}
+
+	app.Action = func(c *cli.Context) error {
 		// No arguments, so we're a desktop web app
 		if c.NArg() < 1 {
 			if err = config.updateIncludesBeancountFile(); err != nil {
@@ -1104,6 +1164,8 @@ func main() {
 			}
 			config.startWebApp()
 		}
+
+		return nil
 	}
 
 	app.Run(os.Args)
