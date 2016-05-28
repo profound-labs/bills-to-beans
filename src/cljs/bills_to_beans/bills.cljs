@@ -178,11 +178,7 @@
                        [:div.container.transaction
                         [:div.row
 
-                         [:div.col-sm-2
-                          [:h4 "Payees"]
-                          [<payees-list> bill-data]]
-
-                         [:div.col-sm-10
+                         [:div.col-sm-8
 
                           [:div.row
                            [:h1 "New Bill"]]
@@ -272,6 +268,11 @@
                             [<tips>]]]
 
                           ]
+
+                         [:div.col-sm-4
+                          [:h4 "Payees"]
+                          [<payees-list> bill-data]]
+
 
                          ]]
                        )})))
