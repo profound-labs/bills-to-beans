@@ -2,9 +2,8 @@
 
 Download and install babun.
 
-Close shell windows and run rebase.bat. This should prevent fork errors. If you
-still see them when running a command, close all shell windows, run update.bat
-and try again.
+Close shell windows and run `rebase.bat`. This should prevent fork errors. If
+you still see them when running a command, try running `update.bat` as well.
 
 Install the dependencies:
 
