@@ -1,6 +1,6 @@
-# Fava on Windows with Cygwin
+# Install Fava on Windows with Cygwin
 
-## Install a Cygwin shell
+## Babun Cygwin shell
 
 Go to [babun](http://babun.github.io/) and download the installer. Extract the
 archive (such as `babun-1.2.0-dist.zip`) and run `install.bat` as a regular user
@@ -18,10 +18,10 @@ Babun installs all its files at `C:\Users\USERNAME\.babun`.
 Close the shell window, open the `.babun` folder in Windows File Explorer and
 run `rebase.bat`.
 
-Later on if you see fork errors when running a command, close all shells, run
-`rebase.bat` and try again.
+Later on if you see [fork::abort](https://github.com/babun/babun/issues/477)
+errors when running a command, close all shells, run `rebase.bat` and try again.
 
-## Install Python3
+## Python3 tools
 
 Open the babun shell and type or copy the following commands one-by-one.
 
@@ -33,7 +33,7 @@ easy_install-3.4 pip
 pip install wheel
 ```
 
-## Install Fava
+## Fava
 
 ```
 pip install beancount-fava
@@ -61,7 +61,4 @@ If the `.whl` is in `Downloads` or some other place, you can also open the
 folder in Windows File Explorer, right click to open the context menu and select
 `Open Babun here`. Use `ls` to see the files and `cd foldername` to change
 folders.
-
-
-
 
