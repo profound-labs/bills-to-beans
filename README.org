@@ -1,0 +1,230 @@
+* Bills to Beans
+
+** Contents                                                             :TOC:
+ - [[#bills-to-beans][Bills to Beans]]
+   - [[#overview][Overview]]
+     - [[#workflow][Workflow]]
+   - [[#screenshots][Screenshots]]
+   - [[#folder-structure][Folder Structure]]
+   - [[#setup][Setup]]
+     - [[#folders][Folders]]
+     - [[#beancount-files][Beancount files]]
+     - [[#fava-on-windows-with-cygwin][Fava on Windows with Cygwin]]
+       - [[#babun-cygwin-shell][Babun Cygwin shell]]
+       - [[#python3-tools][Python3 tools]]
+       - [[#fava][Fava]]
+     - [[#fava-on-linux][Fava on Linux]]
+     - [[#working-with-dropbox][Working with Dropbox]]
+       - [[#dont-sync-the-tmp-folder][Don't sync the tmp folder]]
+   - [[#adding-new-bills][Adding new bills]]
+     - [[#uploading-documents][Uploading documents]]
+   - [[#renaming-accounts-in-every-beancount-file][Renaming accounts in every beancount file]]
+   - [[#compile-a-fava-wheel-file-from-github][Compile a Fava wheel file from Github]]
+
+** Overview
+
+This is a helper tool for [[http://furius.ca/beancount/][beancount]] and [[https://aumayr.github.io/fava/][fava]] to practise [[http://plaintextaccounting.org/][plaintextaccounting]].
+
+It saves transactions as `.beancount` text and keeps bill documents in a regular
+folder structure.
+
+You should type as little as possible but get reports and understand your
+finances with charts.
+
+The `bills-to-beans` program is a self-contained executable file. It doesn't
+install anything. Download, copy to your bills folder and run it.
+
+Windows and Linux.
+
+*** Workflow
+
+- Scan bills, receipts and payments as they come in
+- Add new bills in the browser
+  - uploaded documents are saved in a folder
+  - a `.beancount` plain text file describes the transaction
+- Open `fava` in the browser to navigate and query your accounts
+- Sync it with others via Dropbox
+- Share the documents with your accountant
+
+** Screenshots
+
+TODO
+
+** Folder Structure
+
+Documents and `.beancount` files are saved in a folder structure of this
+pattern:
+
+: year/month/date _ payee _ description _ amount/
+
+Such as:
+
+: 2016/
+:   01/
+:   02/
+:     2016-02-12 _ IKEA _ cupboard _ $55.95/
+:       receipt.pdf
+:       bill.beancount
+:     ...
+:   03/
+:     2016-03-25 _ CarTek _ car service _ $250.20/
+:       receipt.pdf
+:       bill.beancount
+:     ...
+
+** Setup
+*** Folders
+
+The following is an example. You can set it up differently, just put
+`config.yml` in the same folder as the `bills-to-beans` executable, and declare
+the folder paths in it.
+
+: Bills/
+: |  ledger.beancount        ; Main beancount file with account names
+: |  b2b-new-bills.bat       ; Starts the web interface
+: |  b2b-watch.bat           ; Watches the Receipts... folder for changes
+: |  fava-drophere.bat       ; Drag-and-drop the main beancount file to start fava
+: |
+: |- Receipts and Payments/  ; For the bill documents per year and month
+: |
+: |- tools/                  ; Program and config files
+: |    bills-to-beans_win.exe
+: |    bills-to-beans_linux
+: |    config.yml
+: |
+: |--  tmp/
+: |      includes.beancount  ; This file is created by bills-to-beans
+: |
+
+Examples:
+
+=config.yml=
+
+: bills_folder: ../Receipts And Payments
+: main_beancount_file: ../ledger.beancount
+: includes_beancount_file: ./tmp/includes.beancount
+: server_port: 3030
+
+=b2b-new-bills.bat=
+
+: cd tools
+: bills-to-beans_win.exe
+
+=b2b-watch.bat=
+
+: cd tools
+: bills-to-beans_win.exe watch
+
+=fava-drophere.bat=
+
+: start %USERPROFILE%\.babun\cygwin\bin\mintty.exe -e /bin/bash -l -c 'fava "$(cygpath %1)"'
+: start "" "http://localhost:5000"
+
+*** Beancount files
+
+TODO
+
+- ledger.beancount
+  - should have and include directive to the tmp include
+
+- includes.beancount
+
+*** Fava on Windows with Cygwin
+**** Babun Cygwin shell
+
+Go to [[http://babun.github.io/][babun]] and download the installer. Extract the archive (such as =babun-1.2.0-dist.zip=) and run =install.bat= as a regular user (not as Administrator).
+
+After the setup completes, the shell will display the greeting message and a prompt. This is where you type in commands.
+
+: { ~ }  »
+
+Babun installs all its files at =C:\Users\USERNAME\.babun=.
+
+Close the shell window, open the =.babun= folder in Windows File Explorer and run =rebase.bat=.
+
+Later on if you see [[https://github.com/babun/babun/issues/477][fork::abort]] errors when running a command, close all shells, run =rebase.bat= and try again.
+
+**** Python3 tools
+
+Open the babun shell and type or copy the following commands one-by-one.
+
+: pact install python3
+: pact install python3-lxml
+: pact install python3-setuptools
+: easy_install-3.4 pip
+: pip install wheel
+
+**** Fava
+
+: pip install beancount-fava
+
+Now run:
+
+: fava
+
+It should print the usage text.
+
+If you have a newer version of =fava= as a =.whl= file, =cd= to the folder in the shell and install it with:
+
+: pip install beancount_fava-[...].whl
+
+Remember that the =Tab= key will auto-complete the filename after typing the first few letters.
+
+If the =.whl= is in =Downloads= or some other place, you can also open the folder in Windows File Explorer, right click to open the context menu and select =Open Babun here=. Use =ls= to see the files and =cd foldername= to change folders.
+
+*** Fava on Linux
+
+: pip3 install beancount-fava
+
+*** Working with Dropbox
+**** Don't sync the tmp folder
+
+Open =Preferences... > Account > Selective Sync= and uncheck the =tmp= folder where bills-to-beans writes the =includes.beancount= file.
+
+Press =[Update]=, Dropbox will display a message:
+
+: Unchecked folders will be removed from the Computer's Dropbox.
+
+Press =[OK]=
+
+If the =tmp= folder was already present, at this point Dropbox will have probably removed it. Create it again as a New Folder, and Dropbox will ignore it from now on.
+
+** Adding new bills
+*** Uploading documents
+
+Documents can be anything that is related to the transaction and is not a `.beancount`:
+
+-  a PDF with images of bills
+-  a PDF of an email
+-  images from scanning
+
+If the filename of the uploaded document has a recognizable information, it will
+be automatically filled in:
+
+- a date at the beginning of the filename (=YYYYMMDD= or =YYYY-MM-DD=)
+- a numerical amount at the end
+- the middle part will be the description
+
+If a data field is already filled in, it will not be automatically overwritten.
+
+** Renaming accounts in every beancount file
+
+TODO
+
+** Compile a Fava wheel file from Github
+
+: git clone https://github.com/aumayr/fava.git
+: cd fava
+
+: virtualenv -p python3 venv
+: . venv/bin/activate
+: make build-js
+: pip3 install --editable .
+: python setup.py bdist_wheel
+
+See the =.whl= in =dist/=
+
+Install it:
+
+: pip3 install beancount_fava-[...].whl
+
