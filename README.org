@@ -28,9 +28,9 @@ accounting]] with [[http://furius.ca/beancount/][beancount]] and [[https://aumay
 This is a helper tool to record transactions as =.beancount= text and save bill
 documents (PDFs, scans, etc.) in a regular folder structure.
 
-Make accurate entries but type as little as possible. The machine should save
-everything to the right place, and later you can get reports to understand your
-finances with charts.
+The idea is to make accurate transaction entries with as little manual typing as
+possible. The machine should save everything to the right place, and later you
+can get reports to understand your finances with charts.
 
 The =bills-to-beans= program is a self-contained executable file. It doesn't
 install anything. Download, copy to your bills folder and run it.
