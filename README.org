@@ -1,8 +1,6 @@
 * Bills to Beans
 
-![Screenshot of Bills to Beans][screenshot]
-
-[screenshot]: https://github.com/profound-labs/bills-to-beans/raw/master/docs/screenshot.jpg
+<img src="https://github.com/profound-labs/bills-to-beans/raw/master/docs/screenshot.jpg" alt="Screenshot of Bills to Beans"/>
 
 ** Contents                                                             :TOC:
  - [[#bills-to-beans][Bills to Beans]]
