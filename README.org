@@ -67,13 +67,12 @@ The following is an example. You can set it up differently, the important points
 : |
 : |- Receipts and Payments/  ; For the bill documents per year and month
 : |
-: |- tools/                  ; Program and config files
-: |    bills-to-beans.exe
-: |    config.yml
-: |
-: |--  tmp/
-: |      includes.beancount  ; This file is created by bills-to-beans
-: |
+: \- tools/                  ; Program and config files
+:    |  bills-to-beans.exe
+:    |  config.yml
+:    |
+:    \- tmp/
+:         includes.beancount  ; This file is created by bills-to-beans
 
 Examples:
 
