@@ -19,6 +19,9 @@
      - [[#uploading-documents][Uploading documents]]
    - [[#renaming-accounts-in-every-beancount-file][Renaming accounts in every beancount file]]
    - [[#compile-a-fava-wheel-file-from-github][Compile a Fava wheel file from Github]]
+   - [[#development][Development]]
+     - [[#technology][Technology]]
+     - [[#build][Build]]
 
 ** Overview
 
@@ -29,15 +32,12 @@ This is a helper tool to record transactions as =.beancount= text and save bill
 documents (PDFs, scans, etc.) in a regular folder structure.
 
 The idea is to make accurate transaction entries with as little manual typing as
-possible. The machine should save everything to the right place, and later you
-can get reports to understand your finances with charts.
+possible. The web interface should help to fill in details. The app should save
+everything to the right folder, and later you can get reports to understand your
+finances with charts.
 
 The =bills-to-beans= program is a self-contained executable file. It doesn't
 install anything. Download, copy to your bills folder and run it.
-
-Windows and Linux.
-
-Mac OS/X should be possible too if someone can compile this on their machine.
 
 *** Workflow
 
@@ -263,3 +263,30 @@ Install it:
 
 : pip3 install beancount_fava-[...].whl
 
+** Development
+*** Technology
+
+The frontend is ClojureScript based on [[https://github.com/reagent-project/reagent-frontend-template][reagent-frontend]].
+
+The backend is Golang.
+
+*** Build
+
+Compile assets:
+
+: lein clean
+: lein sass once
+: lein with-profile prod cljsbuild once
+: esc -o public.go ./public
+
+Build:
+
+: go build
+
+Run:
+
+: ENV=development go run bills-to-beans.go public.go
+
+Or compile and live reload with =fresh=:
+
+: ENV=development esc -o public.go ./public && fresh

@@ -25,6 +25,17 @@
        ])
     ))
 
+(defn <topnav> []
+  [:nav.navbar.navbar-default
+   [:div.container
+    [:ul.nav.navbar-nav.navbar-right
+     [:li [:a {:href "https://github.com/profound-labs/bills-to-beans#contents"
+               :target "_blank"}
+           [:i.fa.fa-2x.fa-book]]]
+     [:li [:a {:href "https://github.com/profound-labs/bills-to-beans"
+               :target "_blank"}
+           [:i.fa.fa-2x.fa-github]]]]]])
+
 (defn <flash> []
   [:div.container
    [:div.row.col-md-6.col-md-offset-3
@@ -38,6 +49,7 @@
 
 (defn mount-root []
   (r/render [<flash>] (.getElementById js/document "flash"))
+  (r/render [<topnav>] (.getElementById js/document "topbar"))
   (r/render [<home-page>] (.getElementById js/document "app")))
 
 (defn init! []
