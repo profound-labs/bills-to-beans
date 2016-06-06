@@ -1081,8 +1081,8 @@ func actionWatch(c *cli.Context) error {
 		for {
 			select {
 			case event := <-watcher.Events:
-				if path.Ext(event.Name) == ".beancount" && (event.Op&fsnotify.Create == fsnotify.Create || event.Op&fsnotify.Remove == fsnotify.Remove) {
 
+				if event.Op&fsnotify.Create == fsnotify.Create || event.Op&fsnotify.Remove == fsnotify.Remove {
 					var word string
 
 					if event.Op&fsnotify.Create == fsnotify.Create {
@@ -1092,13 +1092,30 @@ func actionWatch(c *cli.Context) error {
 						word = "remove"
 					}
 
-					log.Printf("File %s event: %s\n", word, event.Name)
-					log.Printf("Updating %s\n", config.IncludesBeancountFile)
-					if err = config.updateIncludesBeancountFile(); err != nil {
-						log.Println(err)
-					}
+					if path.Ext(event.Name) == ".beancount" {
+						log.Printf("File %s event: %s\n", word, event.Name)
+						log.Printf("Updating %s\n", config.IncludesBeancountFile)
+						if err = config.updateIncludesBeancountFile(); err != nil {
+							log.Println(err)
+						}
+					} else if event.Op&fsnotify.Create == fsnotify.Create {
+						f, _ := os.Stat(event.Name)
+						if f.IsDir() {
+							log.Printf("File %s event: %s\n", word, event.Name)
 
+							log.Printf("Adding watcher on %s\n", event.Name)
+							if err = watcher.Add(event.Name); err != nil {
+								log.Fatal(err)
+							}
+
+							log.Printf("Updating %s\n", config.IncludesBeancountFile)
+							if err = config.updateIncludesBeancountFile(); err != nil {
+								log.Println(err)
+							}
+						}
+					}
 				}
+
 			case err := <-watcher.Errors:
 				log.Println("error:", err)
 			}
