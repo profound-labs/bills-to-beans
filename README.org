@@ -60,14 +60,14 @@ The following is an example. You can set it up differently, the important points
   directive to the =includes.beancount= file
 
 : Bills/
-: |  finances.beancount      ; Main beancount file with account names
-: |  b2b-new-bills.bat       ; Starts the web interface
-: |  b2b-watch.bat           ; Watches the Receipts... folder for changes
-: |  fava-drophere.bat       ; Drag-and-drop the main beancount file to start fava
+: |  finances.beancount       ; Main beancount file with account names
+: |  b2b-new-bills.bat        ; Starts the web interface
+: |  b2b-watch.bat            ; Watches the Receipts... folder for changes
+: |  fava-drophere.bat        ; Drag-and-drop the main beancount file to start fava
 : |
-: |- Receipts and Payments/  ; For the bill documents per year and month
+: |- Receipts and Payments/   ; For the bill documents per year and month
 : |
-: \- tools/                  ; Program and config files
+: \- tools/                   ; Program and config files
 :    |  bills-to-beans.exe
 :    |  config.yml
 :    |
