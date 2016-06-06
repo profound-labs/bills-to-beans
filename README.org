@@ -68,8 +68,7 @@ The following is an example. You can set it up differently, the important points
 : |- Receipts and Payments/  ; For the bill documents per year and month
 : |
 : |- tools/                  ; Program and config files
-: |    bills-to-beans_win.exe
-: |    bills-to-beans_linux
+: |    bills-to-beans.exe
 : |    config.yml
 : |
 : |--  tmp/
@@ -88,12 +87,12 @@ Examples:
 =b2b-new-bills.bat=
 
 : cd tools
-: bills-to-beans_win.exe
+: bills-to-beans.exe
 
 =b2b-watch.bat=
 
 : cd tools
-: bills-to-beans_win.exe watch
+: bills-to-beans.exe watch
 
 =fava-drophere.bat=
 
