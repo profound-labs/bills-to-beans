@@ -63,8 +63,7 @@ The following is an example. You can set it up differently, the important points
 
 : Bills/
 : |  finances.beancount       ; Main beancount file with account names
-: |  b2b-new-bills.bat        ; Starts the web interface
-: |  b2b-watch.bat            ; Watches the Receipts... folder for changes
+: |  new-bills.bat            ; Starts the web interface
 : |  fava-drophere.bat        ; Drag-and-drop the main beancount file to start fava
 : |
 : |- Receipts and Payments/   ; For the bill documents per year and month
@@ -85,20 +84,54 @@ Examples:
 : includes_beancount_file: ./tmp/includes.beancount
 : server_port: 3030
 
-=b2b-new-bills.bat=
+=new-bills.bat=
 
-: cd tools
-: bills-to-beans.exe
+Set =path_to_b2b_folder= to the folder path where the =bills-to-beans.exe= file
+is.
 
-=b2b-watch.bat=
-
-: cd tools
-: bills-to-beans.exe watch
+#+begin_src
+set path_to_b2b_folder="C:\path\to\b2b"
+cd /d %path_to_b2b_folder%
+bills-to-beans.exe
+#+end_src
 
 =fava-drophere.bat=
 
-: start %USERPROFILE%\.babun\cygwin\bin\mintty.exe -e /bin/bash -l -c 'fava "$(cygpath %1)"'
-: start "" "http://localhost:5000"
+Drag and drop =finances.beancount= on the =.bat= file to start a watcher and start fava.
+
+Set =path_to_b2b_folder= to the folder path where the =bills-to-beans.exe= file
+is.
+
+#+begin_src
+set path_to_b2b_folder="C:\path\to\b2b"
+set path_to_main_beancount_file="%1"
+
+cd /d %path_to_b2b_folder%
+start bills-to-beans.exe watch
+
+start %USERPROFILE%\.babun\cygwin\bin\mintty.exe -e /bin/bash -l -c 'fava "$(cygpath %path_to_main_beancount_file%)"'
+start "" "http://localhost:5000"
+#+end_src
+
+=fava.bat=
+
+Copy to the Desktop to start fava with an icon.
+
+Set =path_to_b2b_folder= to the folder path where the =bills-to-beans.exe= file
+is.
+
+Set =path_to_main_beancount_file= to the path to the =finances.beancount= file.
+
+#+begin_src
+set path_to_b2b_folder="C:\path\to\b2b"
+set path_to_main_beancount_file="C:\path\to\finances.beancount"
+
+cd /d %path_to_b2b_folder%
+start bills-to-beans.exe watch
+
+start %USERPROFILE%\.babun\cygwin\bin\mintty.exe -e /bin/bash -l -c 'fava "$(cygpath %path_to_main_beancount_file%)"'
+start "" "http://localhost:5000"
+#+end_src
 
 =finances.beancount=
 
