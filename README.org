@@ -28,7 +28,7 @@
 ** Overview
 
 Record bills, receipts or payments in the browser and practise [[http://plaintextaccounting.org/][plain text
-accounting]] with [[http://furius.ca/beancount/][beancount]] and [[https://aumayr.github.io/fava/][fava]].
+accounting]] with [[http://furius.ca/beancount/doc/index][beancount]] and [[https://aumayr.github.io/fava/][fava]].
 
 This is a helper tool to record transactions as =.beancount= text and save bill
 documents (PDFs, scans, etc.) in a regular folder structure.
@@ -90,8 +90,8 @@ Set =path_to_b2b_folder= to the folder path where the =bills-to-beans.exe= file
 is.
 
 #+begin_src
-set path_to_b2b_folder="C:\path\to\b2b"
-cd /d %path_to_b2b_folder%
+set path_to_b2b_folder=C:\path\to\b2b
+cd /d "%path_to_b2b_folder%"
 bills-to-beans.exe
 #+end_src
 
@@ -103,13 +103,15 @@ Set =path_to_b2b_folder= to the folder path where the =bills-to-beans.exe= file
 is.
 
 #+begin_src
-set path_to_b2b_folder="C:\path\to\b2b"
-set path_to_main_beancount_file="%1"
+set path_to_b2b_folder=C:\path\to\b2b
+set path_to_main_beancount_file=%1
 
-cd /d %path_to_b2b_folder%
+cd /d "%path_to_b2b_folder%"
 start bills-to-beans.exe watch
 
-start %USERPROFILE%\.babun\cygwin\bin\mintty.exe -e /bin/bash -l -c 'fava "$(cygpath %path_to_main_beancount_file%)"'
+cd /d "%USERPROFILE%\.babun\cygwin\bin"
+start mintty.exe -e /bin/bash -l -c 'fava "$(cygpath %path_to_main_beancount_file%)"'
+
 start "" "http://localhost:5000"
 #+end_src
 
@@ -123,13 +125,15 @@ is.
 Set =path_to_main_beancount_file= to the path to the =finances.beancount= file.
 
 #+begin_src
-set path_to_b2b_folder="C:\path\to\b2b"
-set path_to_main_beancount_file="C:\path\to\finances.beancount"
+set path_to_b2b_folder=C:\path\to\b2b
+set path_to_main_beancount_file=C:\path\to\finances.beancount
 
-cd /d %path_to_b2b_folder%
+cd /d "%path_to_b2b_folder%"
 start bills-to-beans.exe watch
 
-start %USERPROFILE%\.babun\cygwin\bin\mintty.exe -e /bin/bash -l -c 'fava "$(cygpath %path_to_main_beancount_file%)"'
+cd /d "%USERPROFILE%\.babun\cygwin\bin"
+start mintty.exe -e /bin/bash -l -c 'fava "$(cygpath %path_to_main_beancount_file%)"'
+
 start "" "http://localhost:5000"
 #+end_src
 
