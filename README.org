@@ -291,6 +291,7 @@ TODO
 : virtualenv -p python3 venv
 : . venv/bin/activate
 : make build-js
+: pip3 install --upgrade pip
 : pip3 install --editable .
 : python setup.py bdist_wheel
 
@@ -298,7 +299,7 @@ See the =.whl= in =dist/=
 
 Install it:
 
-: pip3 install beancount_fava-[...].whl
+: pip3 install --upgrade beancount_fava-[...].whl
 
 ** Development
 *** Technology
