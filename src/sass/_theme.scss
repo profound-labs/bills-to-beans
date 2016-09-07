@@ -83,6 +83,8 @@ input, select {
     font-family: "monospace";
 }
 
+// NOTE: not using a custom styled upload button. It was difficult the get the click event fire on the file <input> in every browser.
+/*
 input[type="file"].file-input {
     display: none;
 }
@@ -103,3 +105,4 @@ input[type="file"].file-input {
         background-color: #b15315;
     }
 }
+*/
