@@ -147,7 +147,9 @@
           ;; Upload button
           [:tr
            [:td
-            [:div.document-file-upload
+
+            ;; NOTE: not using a custom styled upload button. It was difficult the get the click event fire on the file <input> in every browser.
+            #_[:div.document-file-upload
              [:button.btn.btn-primary {:on-click (fn [e]
                                                    (do (fire! (sel1 (str "#" field-name)) :click)
                                                        (.stopPropagation e)))}
@@ -157,6 +159,7 @@
                                        (fire! (sel1 (str "#" field-name)) :click)
                                        (.stopPropagation e)))}
                [:i.fa.fa-2x.fa-fw.fa-file]]]]
+
             [:input.file-input
              {:type "file"
               :id field-name

@@ -24,6 +24,7 @@
    - [[#development][Development]]
      - [[#technology][Technology]]
      - [[#build][Build]]
+     - [[#development-1][Development]]
 
 ** Overview
 
@@ -329,3 +330,22 @@ Run:
 Or compile and live reload with =fresh=:
 
 : ENV=development esc -o public.go ./public && fresh
+
+*** Development
+
+Start lein figwheel to compile and auto-reload =.cjs=:
+
+: lein figwheel
+
+Run the app:
+
+: ENV=development go run bills-to-beans.go public.go
+
+Open the app in a browser:
+
+: http://localhost:3030/
+
+When the page loads, the figwheel console should show the repl prompt:
+
+: cljs.user=>
+
